@@ -1,0 +1,44 @@
+---
+- name: Initialize the cluster
+  ansible.builtin.shell: kubeadm init --ignore-preflight-errors all --config /etc/kubernetes/kubeadm-config.yaml
+  args:
+    chdir: /home/ubuntu
+    creates: cluster_initialized.log
+
+- name: Copy admin.conf to user's kube config
+  ansible.builtin.copy:
+    src: /etc/kubernetes/admin.conf
+    dest: /home/ubuntu/.kube/config
+    remote_src: true
+    owner: ubuntu
+    mode: "0640"
+
+- name: Wait for kube-system pods become ready
+  become: true
+  become_user: ubuntu
+  ansible.builtin.shell: "kubectl wait --namespace=kube-system --for=condition=Ready pods --selector tier=control-plane --timeout=600s"
+
+# https://docs.tigera.io/calico/latest/getting-started/kubernetes/quickstart
+- name: Install calico networking
+  become: true
+  become_user: ubuntu
+  ansible.builtin.shell: kubectl apply -f https://raw.githubusercontent.com/projectcalico/calico/v3.26.1/manifests/calico.yaml
+
+- name: Wait for calico pods to start
+  ansible.builtin.pause:
+    seconds: 30
+
+- name: Wait for calico pods become ready
+  become: true
+  become_user: ubuntu
+  ansible.builtin.shell: "kubectl wait --namespace=kube-system --for=condition=Ready pods --selector k8s-app=calico-node --timeout=600s"
+
+- name: Remove taint from nodes
+  become: true
+  become_user: ubuntu
+  kubernetes.core.k8s_taint:
+    state: absent
+    name: "{{ hostname }}"
+    taints:
+      - key: "node-role.kubernetes.io/control-plane"
+      - key: "node-role.kubernetes.io/master"

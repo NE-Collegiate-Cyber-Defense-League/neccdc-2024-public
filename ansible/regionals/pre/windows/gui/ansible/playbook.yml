@@ -1,0 +1,41 @@
+---
+- hosts: all
+  gather_facts: false
+
+  tasks:
+    - name: Install Feature RSAT Tools
+      ansible.windows.win_feature:
+        name:
+          - RSAT-Role-Tools
+          - GPMC
+        state: present
+        include_sub_features: true
+        include_management_tools: true
+
+    - name: Ensure Chocolatey itself is installed, using community repo for the bootstrap
+      win_chocolatey:
+        name: chocolatey
+
+    - name: Include choco packages
+      ansible.builtin.include_tasks:
+        file: playbooks/choco.yml
+
+    - name: Include taskbar setup
+      ansible.builtin.include_tasks:
+        file: playbooks/oem.yml
+
+    - name: Install openssh
+      win_chocolatey:
+        name: openssh
+        version: '9.2.2-beta1'
+        package_params: /SSHServerFeature
+        state: present
+        allow_prerelease: yes
+
+    - name: Set the default shell to PowerShell
+      win_regedit:
+        path: HKLM:\SOFTWARE\OpenSSH
+        name: DefaultShell
+        data: C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe
+        type: string
+        state: present

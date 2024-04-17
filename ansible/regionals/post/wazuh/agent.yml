@@ -1,0 +1,60 @@
+- name: Install wazuh on Linux
+  hosts: wazuh_linux
+  become: true
+  gather_facts: true
+  vars_files:
+    - "../../roles/common.yml"
+  tasks:
+    - name: Check if the apt_kubernetes_io.list file exists
+      ansible.builtin.stat:
+        path: /etc/apt/sources.list.d/apt_kubernetes_io.list
+      register: kubernetes_list
+
+    - name: Comment out the specified line if it exists
+      ansible.builtin.lineinfile:
+        path: /etc/apt/sources.list.d/apt_kubernetes_io.list
+        regexp: '^deb \[arch=amd64 signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.asc\] https://apt.kubernetes.io/ kubernetes-xenial main'
+        line: '#deb [arch=amd64 signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.asc] https://apt.kubernetes.io/ kubernetes-xenial main'
+      when: kubernetes_list.stat.exists
+
+    - name: Include wazuh_agent role
+      ansible.builtin.include_role:
+        name: ansible-wazuh-agent
+      vars:
+        wazuh_managers:
+          - address: "10.{{ team }}.128.254"
+            port: 1514
+            protocol: tcp
+            api_port: 55000
+            api_proto: 'http'
+
+    - name: Uncomment the specified line if it exists
+      ansible.builtin.lineinfile:
+        path: /etc/apt/sources.list.d/apt_kubernetes_io.list
+        regexp: '^\s*#?\s*deb \[arch=amd64 signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.asc\] https://apt.kubernetes.io/ kubernetes-xenial main'
+        line: 'deb [arch=amd64 signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.asc] https://apt.kubernetes.io/ kubernetes-xenial main'
+      when: kubernetes_list.stat.exists
+
+
+- name: Install wazuh on Windows
+  hosts: wazuh_windows
+  become: true
+  gather_facts: true
+  vars:
+    ansible_become: true
+    ansible_become_method: runas
+    ansible_become_user: AD\Administrator
+    ansible_become_password: "{{ adserver_password }}"
+  vars_files:
+    - "../../roles/common.yml"
+  tasks:
+    - name: Include wazuh_agent role
+      ansible.builtin.include_role:
+        name: ansible-wazuh-agent
+      vars:
+        wazuh_managers:
+          - address: "10.{{ team }}.128.254"
+            port: 1514
+            protocol: tcp
+            api_port: 55000
+            api_proto: 'http'

@@ -1,0 +1,100 @@
+---
+- name: Create docker network
+  community.docker.docker_network:
+    name: "{{ wg_name }}"
+    ipam_config:
+      - subnet: "192.168.{{ item }}.0/24"
+  when: iptables
+  tags:
+    - wireguard
+    - base
+
+# sudo iptables -I DOCKER-USER 1 -s 192.168.0.0/24 -d 10.0.0.192/27 -j ACCEPT
+- name: Default reject team networks
+  ansible.builtin.iptables:
+    chain: DOCKER-USER
+    source: "192.168.{{ item }}.0/24"
+    destination: "10.{{ item }}.0.0/16"
+    jump: ACCEPT
+  when: iptables
+  tags:
+    - iptables
+    - base
+
+# https://github.com/wg-easy/wg-easy
+- name: Setup Wireguard
+  community.docker.docker_container:
+    name: "wireguard-{{ wg_name }}"
+    image: ghcr.io/wg-easy/wg-easy:11
+    restart_policy: always
+    networks:
+      - name: "{{ 'bridge' if not iptables else wg_name }}"
+    capabilities:
+      - NET_ADMIN
+      - SYS_MODULE
+    sysctls:
+      "net.ipv4.conf.all.src_valid_mark": 1
+      "net.ipv4.ip_forward": 1
+    volumes:
+      - "/opt/wireguard/wireguard-{{ wg_name }}:/etc/wireguard"
+    ports:
+      - "{{ udp_port }}:51820/udp"
+      - "{{ tcp_port }}:51821/tcp"
+    env:
+      WG_HOST: "{{ wireguard_public_host }}"
+      PASSWORD: "{{ wireguard_password }}"
+      WG_PERSISTENT_KEEPALIVE: "1800" # 30 minutes, also set on custom blue team certs
+      WG_DEFAULT_ADDRESS: "{{ wireguard_client_subnet }}"
+      WG_ALLOWED_IPS: "{{ wireguard_allowed_ips }}"
+      WG_PORT: "{{ udp_port | int }}"
+  tags:
+    - wireguard
+    - base
+
+- name: Get session token
+  ansible.builtin.uri:
+    url: "http://{{ wireguard_public_host }}:{{ tcp_port }}/api/session"
+    method: GET
+    status_code: 200
+  register: session
+  tags:
+    - client
+
+- name: Authenticate session token
+  ansible.builtin.uri:
+    url: "http://{{ wireguard_public_host }}:{{ tcp_port }}/api/session"
+    method: POST
+    headers:
+      Cookie: "{{ session.set_cookie }}"
+    body_format: json
+    body:
+      password: "{{ wireguard_password }}"
+    status_code: 204
+  register: login
+  tags:
+    - client
+
+- name: Create wireguard client directory
+  ansible.builtin.file:
+    path: "/opt/wireguard/wireguard-{{ wg_name }}/clients/"
+    state: directory
+    mode: '0755'
+  tags:
+    - client
+
+- name: Slurp server config
+  ansible.builtin.slurp:
+    src: "/opt/wireguard/wireguard-{{ wg_name }}/wg0.json"
+  register: slurp_config
+  tags:
+    - client
+
+- name: Create clients
+  ansible.builtin.include_tasks: client.yaml
+  loop: "{{ clients }}"
+  loop_control:
+    loop_var: client_item
+  vars:
+    wireguard_public_key: "{{ (slurp_config.content | b64decode | from_json).server.publicKey }}"
+  tags:
+    - client

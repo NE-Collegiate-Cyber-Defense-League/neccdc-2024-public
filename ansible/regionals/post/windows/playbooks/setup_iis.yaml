@@ -1,0 +1,49 @@
+---
+- name: Configure Windows IIS
+  hosts: win_web
+  gather_facts: false
+  vars:
+    ansible_become: true
+    ansible_become_method: runas
+    ansible_become_user: AD\Administrator
+    ansible_become_password: "{{ adserver_password }}"
+    iis_site_name: "Default Web Site"
+    cert_template_name: "IIS Web Server"
+    cert_friendly_name: "PSWA Certificate"
+  tasks:
+    - name: Request a certificate
+      ansible.windows.win_powershell:
+        script: |
+          [CmdletBinding()]
+          param (
+              [String]$TemplateName,
+              [String]$FriendlyName
+          )
+
+          $LocalCert = (Get-ChildItem -Path "Cert:\LocalMachine\My" | Where-Object { $_.FriendlyName -eq "$FriendlyName" })
+          
+          if (-not $LocalCert) {
+              $result = (Get-Certificate -Template $TemplateName -CertStoreLocation "Cert:\LocalMachine\My")
+              $result.Certificate.FriendlyName = $FriendlyName
+              $Ansible.Result = $result.Certificate.Thumbprint
+              $Ansible.Changed = $true
+          } else {
+              $Ansible.Result = $LocalCert.Thumbprint
+              $Ansible.Changed = $false
+          }
+
+          return $Ansible
+        error_action: stop
+        parameters:
+          TemplateName: "{{ cert_template_name }}"
+          FriendlyName: "{{ cert_friendly_name }}"
+      register: cert
+  
+    - name: Add a HTTPS binding
+      community.windows.win_iis_webbinding:
+        name: "{{ iis_site_name }}"
+        protocol: https
+        port: 443
+        ip: "*"
+        certificate_hash: "{{ cert.result }}"
+        state: present

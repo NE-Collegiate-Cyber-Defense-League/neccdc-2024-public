@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Black Team Store</title>
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<h1>Black Team Store</h1>
+
+<form id="sale-items-form">
+    <div class="item" onclick="selectItem('item1')">
+        <input type="radio" id="item1" name="selectedItem" value="1" style="display: none">
+        <label for="item1">
+            <h3>Tech Tip</h3>
+            <p>Just a tip</p>
+            <span class="price">1.00</span>
+        </label>
+    </div>
+
+    <div class="item" onclick="selectItem('item3')">
+        <input type="radio" id="item3" name="selectedItem" value="3" style="display: none">
+        <label for="item3">
+            <h3>Riddle</h3>
+            <p>Riddle me this</p>
+            <span class="price">5.00</span>
+        </label>
+    </div>
+
+    <div class="item" onclick="selectItem('item2')">
+        <input type="radio" id="item2" name="selectedItem" value="2" style="display: none">
+        <label for="item2">
+            <h3>Sticker</h3>
+            <p>A sticker hand selected by black team</p>
+            <span class="price">10.00</span>
+        </label>
+    </div>
+
+    <div class="item" onclick="selectItem('item4')">
+        <input type="radio" id="item4" name="selectedItem" value="4" style="display: none">
+        <label for="item4">
+            <h3>5 Minute Hangout</h3>
+            <p>We'll give a single individual a few minutes of our time. (Just chatting, were not helping you)</p>
+            <span class="price">50.00</span>
+        </label>
+    </div>
+
+    <div class="item" onclick="selectItem('item5')">
+        <input type="radio" id="item5" name="selectedItem" value="5" style="display: none">
+        <label for="item5">
+            <h3>Item 5</h3>
+            <p>Description of Item 5. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris.</p>
+            <span class="price">20.00</span>
+        </label>
+    </div>
+
+    <div class="item" onclick="selectItem('item6')">
+        <input type="radio" id="item6" name="selectedItem" value="6" style="display: none">
+        <label for="item6">
+            <h3>Item 6</h3>
+            <p>Description of Item 6. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris.</p>
+            <span class="price">20.00</span>
+        </label>
+    </div>
+
+    <div class="item" onclick="selectItem('item7')">
+        <input type="radio" id="item7" name="selectedItem" value="7" style="display: none">
+        <label for="item7">
+            <h3>Item 7</h3>
+            <p>Description of Item 7. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris.</p>
+            <span class="price">20.00</span>
+        </label>
+    </div>
+
+    <div id="purchase-section" style="display: none;">
+        <hr>
+        <h2>Purchase Section</h2>
+        <input type="text" id="coupon-code" placeholder="Enter team token">
+        <button type="button" onclick="purchase()">Purchase</button>
+    </div>
+</form>
+
+<script>
+    function selectItem(itemId) {
+        var radio = document.getElementById(itemId);
+        radio.checked = true;
+        updateVisualIndicator(itemId);
+        updatePurchaseSection();
+        scrollToCouponForm();
+    }
+
+    function updateVisualIndicator(itemId) {
+        var items = document.querySelectorAll('.item');
+        items.forEach(function(item) {
+            item.classList.remove('selected');
+        });
+        document.getElementById(itemId).parentNode.classList.add('selected');
+    }
+
+    function updatePurchaseSection() {
+        var purchaseSection = document.getElementById("purchase-section");
+        purchaseSection.style.display = "block";
+    }
+
+    function scrollToCouponForm() {
+        var couponForm = document.getElementById("coupon-code");
+        couponForm.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    }
+
+    function showNotification(message, type) {
+        var notification = document.createElement('div');
+        notification.className = 'notification ' + type;
+        notification.textContent = message;
+
+        document.body.appendChild(notification);
+
+        setTimeout(function() {
+            notification.remove();
+        }, 5000); // Remove the notification after 5 seconds
+    }
+
+    function purchase() {
+        var selectedItem = document.querySelector('input[name="selectedItem"]:checked').value;
+        var couponCode = document.getElementById("coupon-code").value;
+
+        var purchaseData = {
+            item: selectedItem,
+            couponCode: couponCode
+        };
+
+        fetch('http://infrasec.sh:3000/purchase', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(purchaseData),
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log(data);
+            showNotification("Purchase successful! Item: " + selectedItem + ", Coupon Code: " + couponCode, 'success');
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showNotification("Error during purchase. Please try again later.", 'error');
+        });
+    }
+</script>
+
+</body>
+</html>

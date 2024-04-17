@@ -1,0 +1,73 @@
+external_url '{{ gitlab_external_url }}'
+
+gitlab_rails['time_zone'] = '{{ gitlab_timezone }}'
+
+gitlab_rails['initial_root_password'] = '{{ gitlab_root_password }}'
+gitlab_rails['store_initial_root_password'] = true
+
+gitlab_sshd['enable'] = {{ gitlab_sshd.enabled | lower }}
+gitlab_sshd['listen_address'] = '0.0.0.0:{{ gitlab_sshd.listen_port }}'
+gitlab_sshd['generate_host_keys'] = {{ gitlab_sshd.generate_host_keys | lower }}
+gitlab_sshd['dir'] = '{{ _paths.gitlab_sshd }}'
+
+nginx['redirect_http_to_https'] = {{ gitlab_ssl | lower }}
+
+nginx['ssl_certificate'] = '{{ _files.ssl_certificate }}'
+nginx['ssl_certificate_key'] = '{{ _files.ssl_certificate_key }}'
+
+registry_external_url '{{ gitlab_registry_url }}'
+registry_nginx['ssl_certificate'] = '{{ _files.ssl_certificate }}'
+registry_nginx['ssl_certificate_key'] = '{{ _files.ssl_certificate_key }}'
+
+letsencrypt['enable'] = {{ gitlab_letsencrypt.enabled | lower }}
+
+# Performance tuning
+puma['worker_processes'] = 0
+
+sidekiq['max_concurrency'] = 10
+
+prometheus_monitoring['enable'] = false
+
+gitlab_rails['env'] = {
+  'MALLOC_CONF' => 'dirty_decay_ms:1000,muzzy_decay_ms:1000'
+}
+
+{% if gitlab_smtp_enabled %}
+gitlab_rails['smtp_enable'] = true
+gitlab_rails['smtp_address'] = "email-smtp.us-east-2.amazonaws.com"
+gitlab_rails['smtp_port'] = 465
+gitlab_rails['smtp_domain'] = "rust.energy"
+gitlab_rails['smtp_authentication'] = "login"
+gitlab_rails['smtp_ssl'] = true
+gitlab_rails['smtp_force_ssl'] = true
+gitlab_rails['gitlab_email_from'] = 'gitlab@rust.energy'
+gitlab_rails['gitlab_email_reply_to'] = 'noreply@rust.energy'
+{% endif %}
+
+
+{% if gitlab_ldap_enabled %}
+gitlab_rails['ldap_enabled'] = true
+gitlab_rails['prevent_ldap_sign_in'] = false
+gitlab_rails['ldap_servers'] = {
+  'main' => {
+    'label' => 'LDAP',
+    'host' =>  '{{ gitlab_ldap.host }}',
+    'port' => '389',
+    'uid' => 'sAMAccountName',
+    'bind_dn' => '{{ gitlab_ldap.bind_dn }}',
+    'password' => '{{ gitlab_ldap.bind_password }}',
+    'encryption' => 'plain',
+    'verify_certificates' => false,
+    'timeout' => 10,
+    'active_directory' => true,
+    'user_filter' => '{{ gitlab_ldap.user_filter }}',
+    'base' => '{{ gitlab_ldap.base }}',
+    'lowercase_usernames' => 'false',
+    'retry_empty_result_with_codes' => [80],
+    'allow_username_or_email_login' => false,
+    'block_auto_created_users' => false,
+    'group_base': '{{ gitlab_ldap.group_base }}',
+    'admin_group' => '{{ gitlab_ldap.admin_group }}'
+  }
+}
+{% endif %}

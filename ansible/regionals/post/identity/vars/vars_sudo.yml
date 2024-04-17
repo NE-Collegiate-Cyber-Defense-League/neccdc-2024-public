@@ -1,0 +1,12 @@
+---
+ipa_sudo_rules_create:
+  - name: IT-Allow-All
+    groups:
+      - admins
+      - ad_admins
+      - ad_server_admins
+      - ad_desktop_admins
+      - ad_operations
+      - ad_operational_tech
+    sudo_options:
+      - '!authenticate'

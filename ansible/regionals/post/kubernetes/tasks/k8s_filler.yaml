@@ -1,0 +1,59 @@
+---
+- name: Fortunes cronjob
+  become: true
+  become_user: ubuntu
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: batch/v1
+      kind: CronJob
+      metadata:
+        name: fortunes
+        namespace: default
+      spec:
+        schedule: "*/60 * * * *"
+        successfulJobsHistoryLimit: 1
+        failedJobsHistoryLimit: 0
+        jobTemplate:
+          spec:
+            template:
+              spec:
+                restartPolicy: Never
+                containers:
+                  - name: free-fortune
+                    image: vanessa/cowsay
+                    args: ["run", "fortune"]
+  tags:
+    - services
+    - filler
+
+- name: Create a prod namespace
+  become: true
+  become_user: ubuntu
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: prod
+        labels:
+          pod-security.kubernetes.io/enforce: privileged
+  tags:
+    - services
+    - filler
+
+- name: Create salmon service account
+  become: true
+  become_user: ubuntu
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: ServiceAccount
+      metadata:
+        name: salmon # 🐟
+        namespace: prod
+  tags:
+    - services
+    - filler

@@ -1,0 +1,6 @@
+node_name: wazuh
+wazuh_dashboard_user: kibanaserver
+wazuh_dashboard_password: PASSWORD
+wazuh_indexer_admin_password: PASSWORD
+wazuh_indexer_security_user: admin
+wazuh_indexer_security_password: PASSWORD

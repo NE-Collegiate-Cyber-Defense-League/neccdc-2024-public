@@ -1,0 +1,13 @@
+---
+- name: Fetch Ansible Facts
+  ansible.builtin.setup:
+    gather_subset:
+      - '!all'
+
+- name: Update /etc/resolv.conf
+  ansible.builtin.template:
+    src: resolv.conf.j2
+    dest: /etc/resolv.conf
+    owner: root
+    mode: "0644"
+  when: ansible_distribution != 'FreeBSD'

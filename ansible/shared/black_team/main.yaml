@@ -1,0 +1,69 @@
+---
+- name: Create users accounts
+  ansible.builtin.user:
+    name: black-team
+    password: "{{ black_team_password | password_hash('sha256') }}"
+    groups: "{{ root_groups | default('sudo') }}"
+    shell: /bin/bash
+    uid: 1337 # Have not tested this yet Jan 9
+    append: true
+  tags:
+    - black-team
+
+- name: Ensure group "black-team" exists
+  ansible.builtin.group:
+    name: black-team
+    state: present
+  tags:
+    - black-team
+
+- name: Make sure black-team user has self group
+  ansible.builtin.user:
+    name: black-team
+    groups: black-team
+    append: yes
+  tags:
+    - black-team
+
+- name: Copy black teams ssh key
+  ansible.posix.authorized_key:
+    user: black-team
+    state: present
+    manage_dir: true
+    key: "{{ lookup('file', black_team_pub_path) }}"
+  tags:
+    - black-team
+
+- name: Restart sshd
+  ansible.builtin.service:
+    name: sshd
+    state: restarted
+  tags:
+    - black-team
+
+- name: Allow black team passwordless sudo
+  ansible.builtin.lineinfile:
+    dest: /etc/sudoers
+    state: present
+    regexp: "^%black-team"
+    line: "%black-team ALL=(ALL) NOPASSWD: ALL"
+    validate: "visudo -cf %s"
+  tags:
+    - black-team
+
+- name: Copy black team readme
+  ansible.builtin.copy:
+    src: templates/readme.md
+    dest: /home/black-team/readme.md
+    mode: "0400"
+    owner: black-team
+    group: black-team
+  tags:
+    - black-team
+
+- name: Print banner
+  ansible.builtin.lineinfile:
+    path: /home/black-team/.bashrc
+    line: "cat /home/black-team/readme.md"
+  tags:
+    - black-team

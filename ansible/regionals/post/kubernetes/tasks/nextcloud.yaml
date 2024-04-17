@@ -1,0 +1,149 @@
+---
+- name: Create Nextcloud namespace
+  become: true
+  become_user: ubuntu
+  kubernetes.core.k8s:
+    name: nextcloud
+    api_version: v1
+    kind: Namespace
+    state: present
+  tags:
+    - services
+    - nextcloud
+
+- name: Create Nextcloud database secret
+  become: true
+  become_user: ubuntu
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Secret
+      type: Opaque
+      metadata:
+        name: nextcloud-database
+        namespace: nextcloud
+      data:
+        username: "{{ 'postgres' | b64encode }}"
+        password: "{{ 'PASSWORD' | b64encode }}"
+        host: "{{ 'postgresql-ha-postgresql.database.svc.cluster.local' | b64encode }}"
+        database: "{{ 'postgres' | b64encode }}"
+  tags:
+    - services
+    - nextcloud
+
+- name: Create nextcloud tls secret
+  become: true
+  become_user: ubuntu
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Secret
+      type: Opaque
+      metadata:
+        name: nextcloud-tls
+        namespace: nextcloud
+      data:
+        tls.crt: "{{ lookup('file', tls_cert_path) | b64encode }}"
+        tls.key: "{{ lookup('file', tls_key_path) | b64encode }}"
+  vars:
+    tls_cert_path: "../../../../documentation/certs/regionals/team_{{ team_number }}/fullchain.crt"
+    tls_key_path: "../../../../documentation/certs/regionals/team_{{ team_number }}/private.key"
+  tags:
+    - services
+    - nextcloud
+
+- name: Create Nextcloud PersistentVolumeClaim
+  become: true
+  become_user: ubuntu
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: PersistentVolumeClaim
+      metadata:
+        name: nextcloud
+        namespace: nextcloud
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 4Gi
+        storageClassName: longhorn
+  tags:
+    - services
+    - nextcloud
+
+- name: Wait for nextcloud pvc to generate
+  ansible.builtin.pause:
+    seconds: 30
+  tags:
+    - services
+    - nextcloud
+
+# https://github.com/nextcloud/helm
+# https://artifacthub.io/packages/helm/nextcloud/nextcloud
+# https://www.applerworld.com/article/host-all-your-personal-data-in-nextcloud-with-kubernetes/
+- name: Create Nextcloud ArgoCD application
+  become: true
+  become_user: ubuntu
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: argoproj.io/v1alpha1
+      kind: Application
+      metadata:
+        name: nextcloud
+        namespace: argocd
+      spec:
+        project: default
+        source:
+          chart: nextcloud
+          repoURL: https://nextcloud.github.io/helm/
+          targetRevision: '4.6.2'
+          helm:
+            releaseName: nextcloud
+            values: |
+              nextcloud:
+                host: "nextcloud.{{ team_number }}.rust.energy"
+                username: admin
+                password: PASSWORD
+              ingress:
+                enabled: true
+                className: haproxy
+                tls:
+                  - secretName: nextcloud-tls
+                    hosts:
+                      - "nextcloud.{{ team_number }}.rust.energy"
+              internalDatabase:
+                enabled: false
+              externalDatabase:
+                enabled: true
+                type: postgresql
+                existingSecret:
+                  enabled: true
+                  secretName: nextcloud-database
+                  usernameKey: username
+                  passwordKey: password
+                  hostKey: host
+                  databaseKey: database
+              persistence:
+                enabled: true
+                existingClaim: nextcloud
+              livenessProbe:
+                enabled: true
+                initialDelaySeconds: 300
+                periodSeconds: 15
+                timeoutSeconds: 5
+        destination:
+          server: "https://kubernetes.default.svc"
+          namespace: nextcloud
+        syncPolicy:
+          automated:
+            prune: true
+            selfHeal: true
+  tags:
+    - services
+    - nextcloud

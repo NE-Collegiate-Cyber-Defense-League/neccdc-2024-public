@@ -1,0 +1,7 @@
+---
+letsencrypt_cert_dir: /etc/ssl
+letsencrypt_install_ca: false
+letsencrypt_ca_list:
+  - "isrgrootx1.pem"
+  - "lets-encrypt-r3.pem"
+letsencrypt_install_cert: false

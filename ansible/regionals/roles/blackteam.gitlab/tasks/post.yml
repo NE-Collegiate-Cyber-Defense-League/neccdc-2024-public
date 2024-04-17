@@ -1,0 +1,309 @@
+################################
+# SSL Config
+################################
+- name: Copy team specific letsencrypt folder
+  ansible.builtin.copy:
+    src: "{{ _paths.team_ssl }}/"
+    dest: "{{ _paths.gitlab_ssl }}"
+    owner: root
+    group: root
+    mode: '0600'
+  when: gitlab_letsencrypt_folder
+  tags: ssl
+
+- name: Create GitLab SSL configuration folder.
+  file:
+    path: "{{ _paths.gitlab_ssl }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0700'
+  when: not gitlab_letsencrypt_folder
+  tags: ssl
+
+- name: Create private key (RSA, 4096 bits)
+  community.crypto.openssl_privatekey:
+    path: "{{ _files.ssl_certificate_key }}"
+  when: gitlab_create_self_signed_cert
+  tags: ssl
+
+- name: Create certificate signing request (CSR) for self-signed certificate
+  community.crypto.openssl_csr_pipe:
+    privatekey_path: "{{ _files.ssl_certificate_key }}"
+    common_name: "{{ gitlab_domain }}"
+    organization_name: "Rust Energy"
+    subject_alt_name:
+      - "DNS:{{ gitlab_domain }}"
+      - "DNS:{{ gitlab_registry_domain }}"
+      - "DNS:{{ gitlab_registry_domain }}"
+  register: csr
+  when: gitlab_create_self_signed_cert
+  tags: ssl
+
+- name: Create self-signed certificate from CSR
+  community.crypto.x509_certificate:
+    path: "{{ _files.ssl_certificate }}"
+    csr_content: "{{ csr.csr }}"
+    privatekey_path: "{{ _files.ssl_certificate_key }}"
+    provider: selfsigned
+  when: gitlab_create_self_signed_cert
+  tags: ssl
+
+- name: Set correct file permissions for SSL certificate and key
+  ansible.builtin.file:
+    path: "{{ _files.ssl_certificate }}"
+    owner: root
+    group: root
+    mode: '0600'
+  tags: ssl
+
+################################
+# GitLab Config
+################################
+# Generate the gitlab.rb config file & execute a reconfig.
+- name: Copy GitLab configuration file.
+  ansible.builtin.template:
+    src: gitlab.rb.j2
+    dest: "{{ _files.config }}"
+    owner: root
+    group: root
+    mode: '0600'
+  notify: GitLabCtl Reconfigure
+  register: gitlab_config
+  tags: config
+
+# By default, handlers run after all the tasks in a particular play have been completed.
+# https://docs.ansible.com/ansible/latest/user_guide/playbooks_handlers.html#controlling-when-handlers-run
+- name: Run the gitlab-ctl reconfigure now.
+  meta: flush_handlers
+  when: gitlab_config.changed
+  tags: config
+
+- name: Wait because it gives 502 if not
+  ansible.builtin.pause:
+    seconds: 60
+  when: gitlab_config.changed
+
+################################
+# GitLab API
+################################
+# https://galaxy.ansible.com/ui/repo/published/community/general/content/module/gitlab_user/?extIdCarryOver=true&sc_cid=701f2000001OH7YAAW
+- name: Modify the gitlab root account
+  community.general.gitlab_user:
+    api_url: "{{ gitlab_external_url }}"
+    validate_certs: false
+    # api_token: "{{ gitlab_pat_token }}"
+    api_username: root
+    api_password: "{{ gitlab_root_password }}" 
+    name: Administrator
+    username: root
+    email: "{{ gitlab_root_email }}"
+    isadmin: true
+    sshkey_name: root
+    sshkey_file: "{{ lookup('ansible.builtin.file', 'files/id_ed25519.pub') }}"
+    state: present
+  # register: gitlab_root_user
+  tags:
+    - api
+
+- name: Update application settings via GitLab API
+  uri:
+    url: "{{ gitlab_external_url }}/api/v4/application/settings"
+    method: PUT
+    headers:
+      PRIVATE-TOKEN: "{{ gitlab_pat_token }}"
+    body:
+      version_check_enabled: false
+    body_format: json
+    validate_certs: false
+  tags:
+    - api
+
+- name: Create GitLab rust-energy group
+  community.general.gitlab_group:
+    api_url: "{{ gitlab_external_url }}"
+    validate_certs: false
+    api_username: root
+    api_password: "{{ gitlab_root_password }}"
+    name: "Rust Energy"
+    path: rust-energy
+    state: present
+  tags:
+    - groups
+
+- name: Create GitLab infrastructure project
+  community.general.gitlab_project:
+    api_url: "{{ gitlab_external_url }}"
+    validate_certs: false
+    api_username: root
+    api_password: "{{ gitlab_root_password }}"
+    name: "{{ item }}"
+    group: rust-energy
+    initialize_with_readme: false
+    state: present
+  loop:
+    - infrastructure
+    - fun
+    - shop
+    - runner
+  tags:
+    - projects
+
+################################
+# Runner Configuration
+################################
+# The token is only shared when the token is first created
+#- name: "Delete runner"
+#  community.general.gitlab_runner:
+#    api_url: "{{ gitlab_external_url }}"
+#    validate_certs: false
+#    api_username: root
+#    api_password: "{{ gitlab_root_password }}"
+#    description: Kubernetes runner
+#    state: absent
+#  tags:
+#    - runner
+
+- name: Register k8s runner
+  community.general.gitlab_runner:
+    api_url: "{{ gitlab_external_url }}"
+    validate_certs: false
+    api_username: root
+    api_password: "{{ gitlab_root_password }}"
+    description: Kubernetes runner
+    state: present
+    active: true
+    tag_list: ['k8s']
+    run_untagged: true
+    locked: false
+  register: runner_token
+  tags:
+    - runner
+
+################################
+# Upload Files to GitLab
+################################
+- name: Upload runner project files
+  ansible.builtin.uri:
+    url: "{{ gitlab_external_url }}/api/v4/projects/rust-energy%2Frunner/repository/files/{{ item | urlencode | replace('/', '%2F') }}"
+    validate_certs: false
+    method: POST
+    status_code: 201
+    body_format: form-multipart
+    headers:
+      PRIVATE-TOKEN: "{{ gitlab_pat_token }}"
+    body:
+      branch: "main"
+      author_email: "llubin@rust.energy"
+      author_name: "Lauren Lubin"
+      content: "{{ lookup('ansible.builtin.template', 'files/git/runner/{{ item }}') }}"
+      commit_message: "Implement runners"
+  vars:
+    team_number: "{{ team }}"
+    gitlab_runner_token: "{{ runner_token.runner.token }}"
+  with_items:
+    - manifests/gitlab-runner.yaml
+    - manifests/namespace.yaml
+    - README.md
+  register: runner_files
+  when: runner_token.runner.token is defined
+  failed_when:
+    - runner_files.status != 201
+    - '"A file with this name already exists" not in runner_files.json.message'
+  tags:
+    - runner
+    - files
+
+- name: Upload infrastructure project files
+  ansible.builtin.uri:
+    url: "{{ gitlab_external_url }}/api/v4/projects/rust-energy%2Finfrastructure/repository/files/{{ item | urlencode | replace('/', '%2F') }}"
+    validate_certs: false
+    method: POST
+    status_code: 201
+    body_format: form-multipart
+    headers:
+      PRIVATE-TOKEN: "{{ gitlab_pat_token }}"
+    body:
+      branch: "main"
+      author_email: "emitchell@rust.energy"
+      author_name: "Emma Mitchell"
+      content: "{{ lookup('ansible.builtin.template', 'files/git/infrastructure/{{ item }}') }}"
+      commit_message: "recursive upload"
+  register: infrastructure_files
+  failed_when:
+    - infrastructure_files.status != 201
+    - '"A file with this name already exists" not in infrastructure_files.json.message'
+  vars:
+    team_number: "{{ team }}"
+  with_items:
+    - values.yaml
+  tags:
+    - infrastructure
+    - files
+
+- name: Upload fun project files
+  ansible.builtin.uri:
+    url: "{{ gitlab_external_url }}/api/v4/projects/rust-energy%2Ffun/repository/files/{{ item | urlencode | replace('/', '%2F') }}"
+    validate_certs: false
+    method: POST
+    status_code: 201
+    body_format: form-multipart
+    headers:
+      PRIVATE-TOKEN: "{{ gitlab_pat_token }}"
+    body:
+      branch: "main"
+      author_email: "llubin@rust.energy"
+      author_name: "Lauren Lubin"
+      content: "{{ lookup('ansible.builtin.template', 'files/git/fun/{{ item }}') }}"
+      commit_message: "Fun is a company culture"
+  register: fun_files
+  failed_when:
+    - fun_files.status != 201
+    - '"A file with this name already exists" not in fun_files.json.message'
+  vars:
+    team_number: "{{ team }}"
+  with_items:
+    - deployment.yaml
+    - ingress.yaml
+    - service.yaml
+    - README.md
+  tags:
+    - fun
+    - files
+
+- name: Upload shop project files
+  ansible.builtin.uri:
+    url: "{{ gitlab_external_url }}/api/v4/projects/rust-energy%2Fshop/repository/files/{{ item | urlencode | replace('/', '%2F') }}"
+    validate_certs: false
+    method: POST
+    status_code: 201
+    body_format: form-multipart
+    headers:
+      PRIVATE-TOKEN: "{{ gitlab_pat_token }}"
+    body:
+      branch: "main"
+      author_email: "lknight@rust.energy"
+      author_name: "Luther Knight"
+      content: "{{ lookup('ansible.builtin.template', 'files/git/shop/{{ item }}') }}"
+      commit_message: "We Shopin"
+  register: shop_files
+  failed_when:
+    - shop_files.status != 201
+    - '"A file with this name already exists" not in shop_files.json.message'
+  vars:
+    team_number: "{{ team }}"
+  with_items:
+    - Dockerfile
+    - .gitlab-ci.yml
+    - manifests/deployment.yaml
+    - manifests/ingress.yaml
+    - manifests/namespace.yaml
+    - manifests/service.yaml
+    # - src/favicon-16x16.png
+    # - src/favicon-32x32.png
+    - src/index.html
+    - src/script.js
+    - src/styles.css
+  tags:
+    - shop
+    - files

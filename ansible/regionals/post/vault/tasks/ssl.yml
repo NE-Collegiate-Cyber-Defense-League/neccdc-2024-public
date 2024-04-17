@@ -1,0 +1,32 @@
+---
+# Template the vault configuration file with SSL listener
+- name: Template the vault configuration file
+  template:
+    src: vault.hcl.j2
+    dest: /usr/local/etc/vault.hcl
+    owner: vault
+    group: vault
+    mode: 0644
+
+# Copy certificate from the documentation/certs directory to the vault configuration directory
+- name: Copy the TLS certificate
+  copy:
+    src: "../../../../../documentation/certs/regionals/team_{{ team }}/fullchain.crt"
+    dest: /usr/local/etc/vault.crt
+    owner: vault
+    group: vault
+    mode: 0644
+
+# Copy key from the documentation/certs directory to the vault configuration directory
+- name: Copy the TLS key
+  copy:
+    src: "../../../../../documentation/certs/regionals/team_{{ team }}/private.key"
+    dest: /usr/local/etc/vault.key
+    owner: vault
+    group: vault
+    mode: 0640
+
+- name: Restart vault service
+  ansible.builtin.service:
+    name: vault
+    state: restarted

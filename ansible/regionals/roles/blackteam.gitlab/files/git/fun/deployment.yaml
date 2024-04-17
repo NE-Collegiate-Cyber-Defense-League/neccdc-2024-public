@@ -1,0 +1,24 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: doom-deployment
+  namespace: default
+  labels:
+    app: doom
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: doom
+  template:
+    metadata:
+      labels:
+        app: doom
+    spec:
+      containers:
+        - image: callumhoughton22/doom-in-docker:0.1
+          imagePullPolicy: Always
+          name: doom
+          ports:
+            - containerPort: 8080
+              protocol: TCP

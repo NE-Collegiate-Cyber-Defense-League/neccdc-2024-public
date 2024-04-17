@@ -1,0 +1,72 @@
+---
+- name: Assert at least one install operation is selected
+  ansible.builtin.assert:
+    that:
+      - "{{ letsencrypt_install_ca | bool }} or {{ letsencrypt_install_cert | bool }}"
+    fail_msg: "No install operation specified. Both are set to false."
+
+- name: Assert valid paths for ssl certificate and key
+  ansible.builtin.assert:
+    that:
+      - team is defined
+      - letsencrypt_ssl_cert is defined
+      - letsencrypt_ssl_key is defined
+    fail_msg: "The letsencrypt_ssl_cert, and letsencrypt_ssl_key need to be defined when installing certificate."
+  when: letsencrypt_install_cert
+
+- name: Create staging directory
+  ansible.builtin.file:
+    path: "{{ letsencrypt_cert_dir }}"
+    state: directory
+    mode: "0600"
+  when: letsencrypt_install_ca or letsencrypt_install_cert
+
+- name: Copy CA certificates
+  ansible.builtin.copy:
+    src: "{{ item }}"
+    dest: "{{ letsencrypt_cert_dir }}"
+    mode: "0600"
+  loop: "{{ letsencrypt_ca_list | default([]) | select() | list }}"
+  when: letsencrypt_install_ca
+
+- name: Install CA and Intermediate certificates
+  ansible.builtin.command:
+    cmd: /usr/sbin/ipa-cacert-manage install {{ item }}
+  register: my_output
+  changed_when: my_output.rc != 0
+  args:
+    chdir: "{{ letsencrypt_cert_dir }}"
+  loop: "{{ letsencrypt_ca_list | default([]) | select() | list }}"
+  when: letsencrypt_install_ca
+
+- name: Update IPA certificate database
+  ansible.builtin.command:
+    cmd: /usr/sbin/ipa-certupdate
+  register: my_output
+  changed_when: my_output.rc != 0
+  when: letsencrypt_install_ca
+
+# Tasks to install certificate
+- name: Copy server certificate and key
+  ansible.builtin.copy:
+    src: "{{ item }}"
+    dest: "{{ letsencrypt_cert_dir }}"
+    mode: "0644"
+  loop:
+    - "../../../../../documentation/certs/regionals/team_{{ team }}/{{ letsencrypt_ssl_cert }}"
+    - "../../../../../documentation/certs/regionals/team_{{ team }}/{{ letsencrypt_ssl_key }}"
+  when: letsencrypt_install_cert
+
+- name: Install server certificate
+  ansible.builtin.command:
+    cmd: /usr/sbin/ipa-server-certinstall --http {{ letsencrypt_cert_dir }}/{{ letsencrypt_ssl_key }} {{ letsencrypt_cert_dir }}/{{ letsencrypt_ssl_cert }} --dirman-password='{{ ipaadmin_password }}' --pin=''
+  register: certinstall_output
+  changed_when: certinstall_output.rc != 0
+  when: letsencrypt_install_cert
+
+- name: Restart IPA services
+  ansible.builtin.command:
+    cmd: /usr/sbin/ipactl restart
+  register: my_output
+  changed_when: my_output.rc != 0
+  when: letsencrypt_install_cert and certinstall_output.rc == 0

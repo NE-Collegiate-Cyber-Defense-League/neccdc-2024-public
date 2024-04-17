@@ -1,0 +1,24 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: gitlab-runner
+  namespace: argocd
+spec:
+  destination:
+    namespace: gitlab-runner
+    server: https://kubernetes.default.svc
+  project: default
+  source:
+    chart: gitlab-runner
+    helm:
+      releaseName: gitlab-runner
+      values: |
+        gitlabUrl: https://gitlab.{{ team_number }}.rust.energy
+        rbac: { create: true }
+        runnerToken: {{ gitlab_runner_token }}
+    repoURL: https://charts.gitlab.io
+    targetRevision: 0.62.0
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

@@ -1,0 +1,7 @@
+# {{ ansible_managed }}
+
+{% for nameserver in hostsetup_dns_servers %}
+nameserver {{ nameserver }}
+{% endfor %}
+options edns0 trust-ad
+search {{ hostsetup_dns_search | join(' ') }}

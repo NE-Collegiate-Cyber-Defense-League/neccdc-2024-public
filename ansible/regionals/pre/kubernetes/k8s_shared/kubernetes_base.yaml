@@ -1,0 +1,133 @@
+---
+- name: Update APT packages
+  ansible.builtin.apt:
+    update_cache: true
+
+- name: Disable SWAP (Kubeadm requirement)
+  ansible.builtin.shell: |
+    swapoff -a
+
+- name: Disable SWAP in fstab (Kubeadm requirement)
+  ansible.builtin.replace:
+    path: /etc/fstab
+    regexp: '^([^#].*?\sswap\s+sw\s+.*)$'
+    replace: '# \1'
+
+- name: Create an empty file for Kubernetes sysctl params
+  ansible.builtin.copy:
+    content: ""
+    dest: /etc/sysctl.d/99-kubernetes-cri.conf
+    force: false
+    mode: "0600"
+
+- name: Configure sysctl params for Kubernetes
+  ansible.builtin.lineinfile:
+    path: /etc/sysctl.d/99-kubernetes-cri.conf
+    line: "{{ item }}"
+  with_items:
+    - 'net.bridge.bridge-nf-call-iptables  = 1'
+    - 'net.ipv4.ip_forward                 = 1'
+    - 'net.bridge.bridge-nf-call-ip6tables = 1'
+
+- name: Apply sysctl params without reboot
+  ansible.builtin.command: sysctl --system
+
+- name: Install APT Transport HTTPS
+  ansible.builtin.apt:
+    name: apt-transport-https
+    state: present
+
+- name: Download Kubernetes key
+  ansible.builtin.get_url:
+    url: https://packages.cloud.google.com/apt/doc/apt-key.gpg
+    dest: /etc/apt/keyrings/kubernetes-apt-keyring.asc
+
+- name: Add Kubernetes APT repository
+  ansible.builtin.apt_repository:
+    repo: "deb [arch=amd64 signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.asc] https://apt.kubernetes.io/ kubernetes-xenial main"
+    state: present
+
+- name: Install Kubelet
+  ansible.builtin.apt:
+    name: kubelet=1.28.*
+    state: present
+    update_cache: true
+
+- name: Install Kubeadm
+  ansible.builtin.apt:
+    name: kubeadm=1.28.*
+    state: present
+
+- name: Enable the Kubelet service, and enable it persistently
+  ansible.builtin.service:
+    name: kubelet
+    enabled: true
+
+- name: Load br_netfilter kernel module
+  community.general.modprobe:
+    name: br_netfilter
+    state: present
+
+- name: Set bridge-nf-call-iptables
+  ansible.posix.sysctl:
+    name: net.bridge.bridge-nf-call-iptables
+    value: 1
+
+- name: Set ip_forward
+  ansible.posix.sysctl:
+    name: net.ipv4.ip_forward
+    value: 1
+
+- name: Check Kubelet args in Kubelet config
+  ansible.builtin.shell: grep "^Environment=\"KUBELET_EXTRA_ARGS=" /etc/systemd/system/kubelet.service.d/10-kubeadm.conf || true
+  register: check_args
+
+- name: Add runtime args in Kubelet config
+  ansible.builtin.lineinfile:
+    dest: "/etc/systemd/system/kubelet.service.d/10-kubeadm.conf"
+    line: "Environment=\"KUBELET_EXTRA_ARGS= {{ kubelet_extra_args }}\""
+    insertafter: '\[Service\]'
+  when: check_args.stdout == ""
+
+- name: Install pip
+  ansible.builtin.apt:
+    name: python3-pip
+    state: present
+
+- name: Install kubernetes python package
+  ansible.builtin.pip:
+    name: kubernetes
+
+- name: Create an empty file for Kubeadm configuring
+  ansible.builtin.copy:
+    content: ""
+    dest: /etc/kubernetes/kubeadm-config.yaml
+    force: false
+    mode: "0600"
+
+- name: Configuring the container runtime including its cgroup driver
+  ansible.builtin.blockinfile:
+    path: /etc/kubernetes/kubeadm-config.yaml
+    block: |
+      apiVersion: kubeadm.k8s.io/v1beta3
+      kind: InitConfiguration
+      nodeRegistration:
+        criSocket: {{ cri_socket }}
+      ---
+      kind: KubeletConfiguration
+      apiVersion: kubelet.config.k8s.io/v1beta1
+      runtimeRequestTimeout: "15m"
+      cgroupDriver: "systemd"
+      systemReserved:
+        cpu: 100m
+        memory: 350M
+      kubeReserved:
+        cpu: 100m
+        memory: 50M
+      enforceNodeAllocatable:
+      - pods
+
+- name: Install awscli
+  ansible.builtin.apt:
+    name: awscli
+    state: present

@@ -1,0 +1,66 @@
+---
+- name: Populate Identity Server
+  hosts: identity
+  become: true
+  vars:
+    adserver_ip: "10.{{ inventory_hostname.split('.')[-3] }}.1.1"
+  vars_files:
+    - ../vars/vars_users.yml
+    - ../vars/vars_sudo.yml
+
+  tasks:
+    - name: Create Trust External Groups
+      freeipa.ansible_freeipa.ipagroup:
+        ipaadmin_password: "{{ ipaadmin_password }}"
+        groups: "{{ item }}"
+        state: present
+      loop: "{{ [ipa_trust_groups_create | default([])] | select() | list }}"
+      loop_control:
+        label: "{{ item | map(attribute='name') }}"
+      register: result
+      failed_when: (result is failed) and (good_fails | select('in', result.msg) | list | length == 0)
+
+    - name: Create Posix Groups
+      freeipa.ansible_freeipa.ipagroup:
+        ipaadmin_password: "{{ ipaadmin_password }}"
+        groups: "{{ item }}"
+        state: present
+      loop: "{{ [ipa_groups_create | default([])] | select() | list }}"
+      loop_control:
+        label: "{{ item | map(attribute='name') }}"
+
+    - name: Populate Identity Groups
+      freeipa.ansible_freeipa.ipagroup:
+        ipaadmin_password: "{{ ipaadmin_password }}"
+        groups: "{{ item }}"
+        action: member
+        state: present
+      loop: "{{ [ipa_group_members_add | default([])] | select() | list }}"
+      loop_control:
+        label: "{{ item | map(attribute='name') }}"
+
+    - name: Populate Sudo Rules
+      freeipa.ansible_freeipa.ipasudorule:
+        ipaadmin_password: "{{ ipaadmin_password }}"
+        name: "{{ item.name }}"
+        description: "{{ item.description | default(omit) }}"
+        user: "{{ item.users | default(omit) }}"
+        group: "{{ item.groups | default(omit) }}"
+        usercategory: "{{ 'all' if 'users' not in item and 'groups' not in item else '' }}"
+        host: "{{ item.hosts | default(omit) }}"
+        hostgroup: "{{ item.hostgroups | default(omit) }}"
+        hostcategory: "{{ 'all' if 'hosts' not in item and 'hostgroups' not in item else '' }}"
+        allow_sudocmd: "{{ item.commands | default(omit) }}"
+        allow_sudocmdgroup: "{{ item.command_groups | default(omit) }}"
+        cmdcategory: "{{ 'all' if 'commands' not in item and 'command_groups' not in item else '' }}"
+        runasuser: "{{ item.runasusers | default(omit) }}"
+        runasgroup: "{{ item.runagroups | default(omit) }}"
+        runasusercategory: "{{ 'all' if 'runasusers' not in item else omit }}"
+        runasgroupcategory: "{{ 'all' if 'runasgroups' not in item else omit }}"
+        sudooption: "{{ item.sudo_options | default(omit) }}"
+        order: "{{ item.order | default(omit) }}"
+        action: sudorule
+        state: present
+      loop: "{{ ipa_sudo_rules_create | default([]) | select() | list }}"
+      loop_control:
+        label: "{{ item.name }}"

@@ -1,0 +1,32 @@
+---
+- name: Web request
+  ansible.builtin.uri:
+    url: "http://{{ wireguard_public_host }}:{{ tcp_port }}/api/wireguard/client"
+    method: POST
+    headers:
+      Cookie: "{{ session.set_cookie }}"
+    body_format: json
+    body:
+      name: "{{ item }}-{{ client_item }}"
+    status_code: 200
+  register: client
+  tags:
+    - client
+
+- name: Create client config
+  ansible.builtin.template:
+    src: templates/wireguard_client.conf
+    dest: "/opt/wireguard/wireguard-{{ wg_name }}/clients/{{ client.json.name }}.conf"
+    mode: "0600"
+  vars:
+    dns: "{{ wireguard_client_dns }}"
+    cidr_range: "24"
+    endpoint: "{{ wireguard_public_host }}"
+    wg_port: "{{ udp_port }}"
+    allowed_ips: "{{ wireguard_allowed_ips }}"
+    private_key: "{{ client.json.privateKey }}"
+    address: "{{ client.json.address }}"
+    public_key: "{{ wireguard_public_key }}"
+    pre_shared_key: "{{ client.json.preSharedKey }}"
+  tags:
+    - client

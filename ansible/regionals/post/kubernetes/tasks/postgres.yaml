@@ -1,0 +1,57 @@
+---
+- name: Create postgresql (database) namespace
+  become: true
+  become_user: ubuntu
+  kubernetes.core.k8s:
+    name: database
+    api_version: v1
+    kind: Namespace
+    state: present
+  tags:
+    - services
+    - database
+
+# https://artifacthub.io/packages/helm/bitnami/postgresql-ha
+# https://github.com/bitnami/charts/tree/main/bitnami/postgresql-ha
+- name: Create PostgreSQL HA ArgoCD application
+  become: true
+  become_user: ubuntu
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: argoproj.io/v1alpha1
+      kind: Application
+      metadata:
+        name: postgresql-ha
+        namespace: argocd
+      spec:
+        project: default
+        source:
+          chart: postgresql-ha
+          repoURL: https://charts.bitnami.com/bitnami
+          targetRevision: '13.2.3'
+          helm:
+            releaseName: postgresql-ha
+            values: |
+              global:
+                storageClass: longhorn
+              postgresql:
+                replicaCount: 1
+                password: "{{ postgresql_password }}"
+                repmgrPassword: "{{ postgresql_password }}"
+              pgpool:
+                adminPassword: "{{ postgresql_password }}"
+              volumePermissions:
+                enabled: true
+              persistence:
+                size: "{{ postgresql_disk_size }}"
+        destination:
+          server: "https://kubernetes.default.svc"
+          namespace: database
+        syncPolicy:
+          automated:
+            prune: true
+            selfHeal: true
+  tags:
+    - services
+    - database

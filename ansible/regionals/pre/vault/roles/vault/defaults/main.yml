@@ -1,0 +1,28 @@
+# Role Vault
+---
+vault_version: 1.15.4
+vault_config_path: /usr/local/etc/vault.hcl
+vault_data_dir: /var/db/vault
+vault_url: http://127.0.0.1:8200
+
+users:
+  - name: SJohnson
+    password: xYz#89Lm1a
+  - name: ASmith
+    password: QwP$42aH8kL
+  - name: EDavis
+    password: 73bR*oPq2fA
+  - name: JMiller
+    password: 5tR@p0xZ7hQ
+  - name: OClark
+    password: L9#sRt2P6gX
+  - name: DWhite
+    password: P!o8qZxY3nS
+  - name: SBrown
+    password: xPz$46Lm9vF
+  - name: ETaylor
+    password: 7kM#3oLq5rT
+  - name: EHall
+    password: Z@8hT4pL2bW
+  - name: LAdams
+    password: L3!xPz2M0sN

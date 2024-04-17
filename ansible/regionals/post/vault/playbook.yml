@@ -1,0 +1,36 @@
+# Post Vault
+---
+- hosts: vault
+  become: true
+  become_method: su
+  become_user: root
+  vars_files:
+    - "../../../../documentation/blue_team_access/regionals/vault_access.json"
+    - "../../../shared/blue_team/vault/credentials.yml"
+    - "../../roles/common.yml"
+  vars:
+    vault_url: "https://vault.{{ team }}.rust.energy"
+  tasks:
+    - name: Include host setup role
+      ansible.builtin.include_role:
+        name: "../../roles/hostsetup"
+      vars:
+        hostsetup_hostname: "{{ hostname }}"
+        hostsetup_fqdn: "{{ hostname }}.{{ ipaserver_domain }}"
+        hostsetup_timezone: "America/New_York"
+
+    - name: Include blue_team access
+      ansible.builtin.include_tasks:
+        file: "../../../shared/blue_team/vault/user.yaml"
+
+    # Handles deploying new vault config with SSL certs
+    - name: Import SSL tasks
+      ansible.builtin.import_tasks:
+        file: "tasks/ssl.yml"
+      tags: ssl
+
+    # Handles vault unseal, userauth, policy setup, and creation of user in vault
+    - name: Import setup tasks
+      ansible.builtin.import_tasks:
+        file: "tasks/setup.yml"
+      tags: setup

@@ -1,0 +1,199 @@
+---
+- name: Create code server service account
+  become: true
+  become_user: ubuntu
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: ServiceAccount
+      metadata:
+        name: code
+        namespace: default
+  tags:
+    - code
+
+- name: Create code cluster role to list pods
+  become: true
+  become_user: ubuntu
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: rbac.authorization.k8s.io/v1
+      kind: ClusterRole
+      metadata:
+        name: pod-list-reader-role
+      rules:
+        - apiGroups:
+            - ""
+          resources:
+            - "*"
+          verbs:
+            - "list"
+            - "get"
+  tags:
+    - code
+
+- name: Create code service account policy binding
+  become: true
+  become_user: ubuntu
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: rbac.authorization.k8s.io/v1
+      kind: ClusterRoleBinding
+      metadata:
+        name: pod-list-reader-binding
+        namespace: default
+      subjects:
+        - kind: ServiceAccount
+          name: code
+          namespace: default
+      roleRef:
+        kind: ClusterRole
+        name: pod-list-reader-role
+        apiGroup: rbac.authorization.k8s.io
+  tags:
+    - code
+
+# https://hub.docker.com/r/linuxserver/code-server
+- name: Create code server deployment
+  become: true
+  become_user: ubuntu
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: apps/v1
+      kind: Deployment
+      type: Opaque
+      metadata:
+        name: "code-server"
+        namespace: default
+      spec:
+        replicas: 1
+        selector:
+          matchLabels:
+            app: code-server
+        template:
+          metadata:
+            labels:
+              app: code-server
+          spec:
+            serviceAccountName: code
+            restartPolicy: Always
+            initContainers:
+              - name: init-container
+                image: busybox:latest  # Use any image that has basic shell tools
+                command: ["/bin/sh", "-c"]
+                args:
+                  - |
+                    echo "FROM nginx:oldest" > /workspace/Dockerfile
+                    echo "USER root" >> /workspace/Dockerfile
+                    echo "CMD ['/app.js']" >> /workspace/Dockerfile
+                    echo "TODO" > /workspace/docker-compose.yaml
+                    echo "The ultimate Kubernetes and YAML creation platform" > /workspace/README.md
+                    echo "This should help you guys -- BLT" >> /workspace/README.md
+                    echo "apiVersion: networking.k8s.io/v1" > /workspace/config.yaml
+                    mkdir /workspace/src
+                    touch /workspace/.dockerignore
+                    touch /workspace/.gitignore
+                    echo "var AWS = require("aws-sdk");" > /workspace/src/app.js
+                    echo "" > /workspace/package.json
+                volumeMounts:
+                  - name: workspace
+                    mountPath: /workspace
+            containers:
+              - name: code-server
+                image: lscr.io/linuxserver/code-server:latest
+                ports:
+                  - containerPort: 8443
+                env:
+                  - name: PUID
+                    value: "0"
+                  - name: PGID
+                    value: "0"
+                  - name: TZ
+                    value: "Etc/UTC"
+                  - name: DEFAULT_WORKSPACE
+                    value: "/workspace"
+                volumeMounts:
+                  - name: workspace
+                    mountPath: /workspace/
+            volumes:
+              - name: workspace
+                emptyDir: {}
+  tags:
+    - code
+
+- name: Create code server service
+  become: true
+  become_user: ubuntu
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Service
+      metadata:
+        name: code-server
+        namespace: default
+      spec:
+        selector:
+          app: code-server
+        ports:
+          - port: 8443
+            targetPort: 8443
+  tags:
+    - code
+
+- name: Create code tls secret
+  become: true
+  become_user: ubuntu
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Secret
+      type: Opaque
+      metadata:
+        name: code-tls
+        namespace: default
+      data:
+        tls.crt: "{{ lookup('file', tls_cert_path) | b64encode }}"
+        tls.key: "{{ lookup('file', tls_key_path) | b64encode }}"
+  vars:
+    tls_cert_path: "../../../../documentation/certs/regionals/team_{{ team_number }}/fullchain.crt"
+    tls_key_path: "../../../../documentation/certs/regionals/team_{{ team_number }}/private.key"
+  tags:
+    - services
+    - code
+
+- name: Create code server ingress
+  become: true
+  become_user: ubuntu
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: networking.k8s.io/v1
+      kind: Ingress
+      metadata:
+        name: code-server
+        namespace: default
+      spec:
+        ingressClassName: haproxy
+        rules:
+          - host: "code.{{ team_number }}.rust.energy"
+            http:
+              paths:
+                - backend:
+                    service:
+                      name: code-server
+                      port:
+                        number: 8443
+                  path: /
+                  pathType: Prefix
+        tls:
+          - secretName: code-tls
+            hosts:
+              - "code.{{ team_number }}.rust.energy"
+  tags:
+    - code

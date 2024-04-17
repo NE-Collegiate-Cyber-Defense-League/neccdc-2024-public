@@ -1,0 +1,188 @@
+---
+# Currently not used...
+# ssh-keygen -t ed25519 -C "GitLab" -b 1028
+- name: Create GitLab infrastructure SSH key secret
+  become: true
+  become_user: ubuntu
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Secret
+      type: Opaque
+      metadata:
+        name: gitlab-infrastructure-repo
+        namespace: argocd
+        labels:
+          argocd.argoproj.io/secret-type: repository
+      data:
+        insecure: "{{ 'true' | b64encode }}"
+        name: "{{ 'gitlab' | b64encode }}"
+        project: "{{ 'default' | b64encode }}"
+        type: "{{ 'git' | b64encode }}"
+        url: "{{ ('git@gitlab.' + team_number | string + '.rust.energy:rust-energy/infrastructure.git') | b64encode }}"
+        sshPrivateKey: LS0tLS1CRUdJTiBPUEVOU1.....
+  tags:
+    - services
+    - gitlab_apps
+
+- name: Create GitLab runner SSH key secret
+  become: true
+  become_user: ubuntu
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Secret
+      type: Opaque
+      metadata:
+        name: gitlab-runner-repo
+        namespace: argocd
+        labels:
+          argocd.argoproj.io/secret-type: repository
+      data:
+        insecure: "{{ 'true' | b64encode }}"
+        name: "{{ 'gitlab' | b64encode }}"
+        project: "{{ 'default' | b64encode }}"
+        type: "{{ 'git' | b64encode }}"
+        url: "{{ ('git@gitlab.' + team_number | string + '.rust.energy:rust-energy/runner.git') | b64encode }}"
+        sshPrivateKey: LS0tLS1CRUdJTiBPUEVOU1.....
+  tags:
+    - services
+    - gitlab_apps
+
+- name: Create GitLab fun SSH key secret
+  become: true
+  become_user: ubuntu
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Secret
+      type: Opaque
+      metadata:
+        name: gitlab-fun-repo
+        namespace: argocd
+        labels:
+          argocd.argoproj.io/secret-type: repository
+      data:
+        insecure: "{{ 'true' | b64encode }}"
+        name: "{{ 'gitlab' | b64encode }}"
+        project: "{{ 'default' | b64encode }}"
+        type: "{{ 'git' | b64encode }}"
+        url: "{{ ('git@gitlab.' + team_number | string + '.rust.energy:rust-energy/fun.git') | b64encode }}"
+        sshPrivateKey: LS0tLS1CRUdJTiBPUEVOU1.....
+  tags:
+    - services
+    - gitlab_apps
+
+- name: Create GitLab shop SSH key secret
+  become: true
+  become_user: ubuntu
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Secret
+      type: Opaque
+      metadata:
+        name: gitlab-shop-repo
+        namespace: argocd
+        labels:
+          argocd.argoproj.io/secret-type: repository
+      data:
+        insecure: "{{ 'true' | b64encode }}"
+        name: "{{ 'gitlab' | b64encode }}"
+        project: "{{ 'default' | b64encode }}"
+        type: "{{ 'git' | b64encode }}"
+        url: "{{ ('git@gitlab.' + team_number | string + '.rust.energy:rust-energy/shop.git') | b64encode }}"
+        sshPrivateKey: LS0tLS1CRUdJTiBPUEVOU1.....
+  tags:
+    - services
+    - gitlab_apps
+
+- name: Create GitLab registry auth secret
+  become: true
+  become_user: ubuntu
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Secret
+      type: kubernetes.io/dockerconfigjson
+      metadata:
+        name: gitlab-registry
+        namespace: default
+      data:
+        .dockerconfigjson: "{{ docker_json | to_json | b64encode }}"
+  vars:
+    docker_json: |
+      {
+        "auths": {
+          "registry.{{ team_number }}.rust.energy": {
+            "username": "root",
+            "password": "PASSWORD",
+            "email": "admin@rust.energy",
+            "auth": "{{ 'root:PASSWORD' | b64encode }}"
+          }
+        }
+      }
+  tags:
+    - services
+    - gitlab_apps
+
+- name: Create GitLab infrastructure application
+  become: true
+  become_user: ubuntu
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: argoproj.io/v1alpha1
+      kind: Application
+      metadata:
+        name: infrastructure
+        namespace: argocd
+      spec:
+        project: default
+        source:
+          repoURL: git@gitlab.{{ team_number }}.rust.energy:rust-energy/infrastructure.git
+          path: './'
+          targetRevision: main
+        destination:
+          server: "https://kubernetes.default.svc"
+          namespace: default
+        syncPolicy:
+          automated:
+            prune: true
+            selfHeal: true
+  tags:
+    - services
+    - gitlab_apps
+
+- name: Create GitLab runner application
+  become: true
+  become_user: ubuntu
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: argoproj.io/v1alpha1
+      kind: Application
+      metadata:
+        name: gitlab
+        namespace: argocd
+      spec:
+        project: default
+        source:
+          repoURL: git@gitlab.{{ team_number }}.rust.energy:rust-energy/runner.git
+          path: manifests
+          targetRevision: main
+        destination:
+          server: "https://kubernetes.default.svc"
+          namespace: argocd
+        syncPolicy:
+          automated:
+            prune: true
+            selfHeal: true
+  tags:
+    - services
+    - gitlab_apps

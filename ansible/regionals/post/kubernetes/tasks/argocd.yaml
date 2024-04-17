@@ -1,0 +1,138 @@
+---
+- name: Create a argocd namespace
+  become: true
+  become_user: ubuntu
+  kubernetes.core.k8s:
+    name: argocd
+    api_version: v1
+    kind: Namespace
+    state: present
+  tags:
+    - services
+    - argocd
+
+# https://artifacthub.io/packages/helm/argo/argo-cd
+- name: Deploy ArgoCD
+  become: true
+  become_user: ubuntu
+  kubernetes.core.helm:
+    name: argocd
+    chart_ref: argo/argo-cd
+    chart_version: '6.0.5'
+    release_namespace: argocd
+    values:
+      configs:
+        rbac:
+          policy.csv: |
+            g, readonly, role:readonly
+            g, root, role:admin
+      server:
+        extraArgs:
+          - '--insecure'
+      repoServer:
+        env:
+          - name: ARGOCD_GIT_MODULES_ENABLED
+            value: 'false'
+      notifications:
+        context:
+          clusterName: rust-energy
+  tags:
+    - services
+    - argocd
+
+- name: Create argocd web tls secret
+  become: true
+  become_user: ubuntu
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Secret
+      type: Opaque
+      metadata:
+        name: argocd-tls
+        namespace: argocd
+      data:
+        tls.crt: "{{ lookup('file', tls_cert_path) | b64encode }}"
+        tls.key: "{{ lookup('file', tls_key_path) | b64encode }}"
+  vars:
+    tls_cert_path: "../../../../documentation/certs/regionals/team_{{ team_number }}/fullchain.crt"
+    tls_key_path: "../../../../documentation/certs/regionals/team_{{ team_number }}/private.key"
+  tags:
+    - services
+    - argocd
+
+- name: Create argocd ingress
+  become: true
+  become_user: ubuntu
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: networking.k8s.io/v1
+      kind: Ingress
+      metadata:
+        name: argocd-server
+        namespace: argocd
+      spec:
+        ingressClassName: haproxy
+        rules:
+          - host: "argocd.{{ team_number }}.rust.energy"
+            http:
+              paths:
+                - backend:
+                    service:
+                      name: argocd-server
+                      port:
+                        number: 443
+                  path: /
+                  pathType: Prefix
+        tls:
+          - secretName: argocd-tls
+            hosts:
+              - argocd.{{ team_number }}.rust.energy
+  tags:
+    - services
+    - argocd
+
+- name: Wait for argocd init secret to be generated
+  ansible.builtin.pause:
+    seconds: 30
+  tags:
+    - services
+    - argocd
+
+- name: Retrieve password from Argo CD secret
+  become: true
+  become_user: ubuntu
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Secret
+    namespace: argocd
+    name: argocd-initial-admin-secret
+  register: argocd_secret
+  tags:
+    - services
+    - argocd
+
+- name: Display Argo CD secret password
+  ansible.builtin.debug:
+    var: argocd_secret.resources[0].data.password | b64decode
+  tags:
+    - services
+    - argocd
+
+- name: Login to Argo CD
+  ansible.builtin.command:
+    cmd: argocd login argocd.{{ team_number }}.rust.energy --insecure --username admin --password {{ argocd_secret.resources[0].data.password | b64decode }}
+  ignore_errors: true
+  tags:
+    - services
+    - argocd
+
+- name: Update Argo CD admin password
+  ansible.builtin.command:
+    cmd: argocd account update-password --account admin --new-password PASSWORD --current-password {{ argocd_secret.resources[0].data.password | b64decode }}
+  ignore_errors: true
+  tags:
+    - services
+    - argocd

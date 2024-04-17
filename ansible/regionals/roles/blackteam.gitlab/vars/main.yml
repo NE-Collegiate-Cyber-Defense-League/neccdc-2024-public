@@ -1,0 +1,32 @@
+---
+# Private vars for role
+_dependencies:
+  - openssh-server
+  - curl
+  - openssl
+  - tzdata
+  - git
+  - unzip
+  - gnupg2
+  - python3-pip
+
+_python_packages:
+  - requests
+  - python-gitlab
+
+_files:
+  config: /etc/gitlab/gitlab.rb
+  cli: /usr/bin/gitlab-ctl
+  ssl_certificate: /etc/gitlab/ssl/fullchain.crt
+  ssl_certificate_key: /etc/gitlab/ssl/private.key
+  smtp_secret: /etc/gitlab/smtp_secret
+
+_installation_script:
+  url: "https://packages.gitlab.com/install/repositories/gitlab/{{ gitlab_edition }}/script.deb.sh"
+  tmp_file: /tmp/gitlab_install_repository.sh
+
+_paths:
+  team_ssl: "../../../../../documentation/certs/regionals/{{ gitlab_letsencrypt_folder }}"
+  gitlab_ssl: /etc/gitlab/ssl
+  gitlab_sshd: /var/opt/gitlab/gitlab-sshd
+  ssh_hostkeys: /etc/ssh

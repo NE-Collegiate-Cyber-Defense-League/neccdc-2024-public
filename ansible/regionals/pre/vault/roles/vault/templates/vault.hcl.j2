@@ -1,0 +1,16 @@
+ui            = true
+disable_mlock = true
+
+storage "file" {
+  path    = "{{ vault_data_dir}}"
+}
+
+listener "tcp" {
+  address         = "[::]:8200"
+  cluster_address = "[::]:8201"
+  tls_disable     = "true"
+}
+
+user_lockout "all" {
+    disable_lockout = true
+}

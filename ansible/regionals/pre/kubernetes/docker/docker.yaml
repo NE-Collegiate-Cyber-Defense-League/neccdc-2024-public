@@ -1,0 +1,68 @@
+---
+- name: Download docker key
+  ansible.builtin.get_url:
+    url: https://download.docker.com/linux/ubuntu/gpg
+    dest: /etc/apt/keyrings/docker.asc
+
+- name: Add Docker's APT repository
+  ansible.builtin.apt_repository:
+    repo: "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+    state: present
+
+- name: Install docker
+  ansible.builtin.apt:
+    name: docker.io
+    state: present
+
+- name: Configure Docker daemon
+  ansible.builtin.template:
+    src: "daemon.json.j2"
+    dest: /etc/docker/daemon.json
+
+- name: Replace Docker daemon configuration line
+  lineinfile:
+    path: /lib/systemd/system/docker.service
+    regexp: '^ExecStart='
+    line: 'ExecStart=/usr/bin/dockerd -H fd:// --containerd=/run/containerd/containerd.sock'
+
+- name: Restart and enable the docker service
+  ansible.builtin.systemd:
+    name: docker
+    state: restarted
+    enabled: true
+    daemon-reload: true
+
+- name: Add docker group to user
+  ansible.builtin.user:
+    name: ubuntu
+    groups: docker
+    append: true
+
+# https://mirantis.github.io/cri-dockerd/usage/using-with-kubernetes/
+# If you want to go down the manual way https://devopstales.github.io/home/migrate-kubernetes-to-dockershim/
+- name: Download cri-dockerd deb
+  ansible.builtin.get_url:
+    url: "https://github.com/Mirantis/cri-dockerd/releases/download/v0.3.9/cri-dockerd_0.3.9.3-0.ubuntu-jammy_amd64.deb"
+    dest: "/tmp/cri-dockerd.deb"
+
+- name: Install cri-dockerd package
+  ansible.builtin.apt:
+    deb: "/tmp/cri-dockerd.deb"
+    state: present
+
+- name: Remove cri-docker deb file
+  ansible.builtin.file:
+    path: "/tmp/cri-dockerd.deb"
+    state: absent
+
+- name: Enable cri-docker service
+  ansible.builtin.service:
+    name: cri-docker.service
+    state: started
+    enabled: true
+
+- name: Enable cri-docker socket
+  ansible.builtin.service:
+    name: cri-docker.socket
+    state: started
+    enabled: true

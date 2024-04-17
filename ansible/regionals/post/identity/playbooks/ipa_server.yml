@@ -1,0 +1,99 @@
+---
+- name: Create Identity Server
+  hosts: identity
+  become: true
+  vars_files:
+    - "../../../roles/common.yml"
+  vars:
+    fqdn: "{{ hostname }}.{{ team }}.rust.energy"
+  
+  tasks:
+    - name: Include host setup role
+      ansible.builtin.include_role:
+        name: "../../../roles/hostsetup"
+      vars:
+        hostsetup_hostname: "{{ hostname }}"
+        hostsetup_fqdn: "{{ fqdn }}"
+        hostsetup_timezone: "America/New_York" 
+
+    - name: Include blue_team access
+      ansible.builtin.include_tasks:
+        file: "../../../../shared/blue_team/identity/user.yaml"
+
+    - name: Install IPAServer role
+      ansible.builtin.include_role:
+        name: "../roles/ipaserver"
+      vars:
+        state: present
+        # Base Variables
+        ipadm_password: "{{ ipaadmin_password }}"
+        ipaserver_realm: "{{ ipaserver_domain | upper }}"
+        ipaserver_hostname: "{{ fqdn }}"
+        ipaserver_ip_addresses: "10.{{ team }}.128.132"
+        ipaserver_no_host_dns: true # Dont use DNS for hostname lookup during install
+
+        # Server Variables
+        ipaserver_setup_adtrust: true
+        ipaserver_setup_dns: true
+        ipaserver_setup_ca: true
+
+        # Client Variables
+        ipaclient_mkhomedir: true
+
+        # DNS Variables
+        ipaserver_no_reverse: true
+        ipaserver_auto_forwarders: true
+        #ipaserver_forwarders: "{{ primary_dns }}"
+        
+        # Special Variables
+        ipaserver_setup_firewalld: true
+        ipaserver_firewalld_zone: public
+
+    - name: Set Global IPA Settings
+      freeipa.ansible_freeipa.ipaconfig:
+        ipaadmin_password: "{{ ipaadmin_password }}"
+        defaultshell: /bin/bash
+
+    - name: Enable ports required for cross forest trust
+      ansible.posix.firewalld:
+        service: "{{ item }}"
+        permanent: true
+        state: enabled
+        immediate: true
+      with_items:
+        - freeipa-ldap
+        - freeipa-ldaps
+        - dns
+    
+    - name: Ensure lines are present at the end of the http config
+      ansible.builtin.blockinfile:
+        path: /etc/httpd/conf.d/ipa-rewrite.conf
+        block: |
+          RewriteCond %{HTTP_COOKIE} !ipa_session
+          RewriteCond %{HTTP_REFERER} ^(.+)/ipa/ui/$
+          RewriteRule ^/ipa/session/json$ - [R=401,L]
+          RedirectMatch 401 ^/ipa/session/login_kerberos
+        marker: "# {mark} ANSIBLE MANAGED BLOCK"
+        insertafter: EOF
+
+    - name: Add custom httpd config
+      ansible.builtin.blockinfile:
+        path: /etc/httpd/conf.d/no-login-popup.conf
+        block: |
+          BrowserMatch Windows gssapi-no-negotiate
+        marker: "# {mark} ANSIBLE MANAGED BLOCK"
+        create: true
+        insertafter: EOF
+
+    - name: Include letsencrypt role
+      ansible.builtin.include_role:
+        name: ../roles/letsencrypt
+      vars:
+        letsencrypt_install_ca: true
+        letsencrypt_install_cert: true
+        letsencrypt_ssl_cert: fullchain.crt
+        letsencrypt_ssl_key: private.key
+    
+    # letsencrypt role handles the restart
+    #- name: Restart IPA service
+    #  ansible.builtin.command: ipactl restart

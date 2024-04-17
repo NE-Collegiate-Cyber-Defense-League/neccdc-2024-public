@@ -1,0 +1,33 @@
+#
+# Blue Team User Configuration
+# The only modification required here is to change the mount_name variable to match the host.
+#
+---
+# Include the shared centralized credentials
+- name: BlueTeam - Include centralized credentials
+  include_vars: ../credentials.yml
+
+# Load the specified user from the credentials
+- name: BlueTeam - Set user fact from credentials
+  set_fact:
+    user: "{{ secrets | selectattr('mount', 'match', mount_name) | selectattr('path', 'match', 'Host Access') | first }}"
+  vars:
+    mount_name: GitLab
+
+# Configure the defined user
+- name: BlueTeam - Configure the defined user
+  ansible.builtin.user:
+    name: "{{ user.data.username }}"
+    password: "{{ user.data.password | password_hash('sha256') }}"
+    shell: /bin/bash
+    groups: sudo
+    append: true
+    state: present
+
+# Add the user's public key to the authorized_keys file
+- name: Modifies ubuntu user authorized_keys on gitlab
+  ansible.posix.authorized_key:
+    user: "{{ user.data.username }}"
+    state: present
+    manage_dir: true
+    key: "{{ lookup('file', './id_ed25519.pub') }}"

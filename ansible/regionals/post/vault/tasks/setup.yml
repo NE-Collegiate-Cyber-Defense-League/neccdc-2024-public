@@ -1,0 +1,86 @@
+---
+################################
+# Seal Management for vault
+################################
+# Can keep the seal management here but also can be added to packer
+# Seal Management for vault
+- name: Check if Vault is sealed
+  uri:
+    url: "{{ vault_url }}/v1/sys/seal-status"
+    method: GET
+    validate_certs: false
+  register: seal_status
+
+- name: Send unseal keys to Vault
+  uri:
+    url: "{{ vault_url }}/v1/sys/unseal"
+    method: POST
+    body_format: json
+    body:
+      key: "{{ item }}"
+    validate_certs: false
+  with_items: "{{ vault_access['keys'][:2] }}"
+  when: seal_status.json.sealed == true
+
+################################
+# Add policies
+################################
+# Create vault superuser for userpass auth
+- name: Create the superuser
+  uri:
+    url: "{{ vault_url }}/v1/auth/userpass/users/{{ vault_superuser.username }}"
+    method: POST
+    headers:
+      X-Vault-Token: "{{ vault_access['root_token'] }}"
+    body_format: json
+    body:
+      password: "{{ vault_superuser.password }}"
+      policies: "{{ vault_superuser.policies }}"
+    status_code: [200, 204]
+    validate_certs: false
+
+################################
+# Add secrets engines
+################################
+# Get current secrets engine mounts
+- name: Get the list of secrets engine mounts
+  uri:
+    url: "{{ vault_url }}/v1//sys/mounts"
+    method: GET
+    headers:
+      X-Vault-Token: "{{ vault_access['root_token'] }}"
+    validate_certs: false
+  register: mounts
+
+# Create the KV secrets engine
+- name: Create KV (v2) secrets engine
+  uri:
+    url: "{{ vault_url }}/v1/sys/mounts/{{ item }}"
+    method: POST
+    headers:
+      X-Vault-Token: "{{ vault_access['root_token'] }}"
+    body_format: json
+    body:
+      type: "kv"
+      options:
+        version: "2"
+    status_code: [200, 204]
+    validate_certs: false
+  when: '(item ~ "/") | string not in mounts.json.data'
+  loop: "{{ secrets | map(attribute='mount') | unique }}"
+
+################################
+# Populate KV engines with credentials 
+################################
+- name: Populate KV engines with credentials
+  uri:
+    url: "{{ vault_url }}/v1/{{ item.mount | urlencode }}/data/{{ item.path | urlencode }}"
+    method: POST
+    headers:
+      X-Vault-Token: "{{ vault_access['root_token'] }}"
+    body_format: json
+    body:
+      data: "{{ item.data }}"
+    status_code: [200, 204]
+    validate_certs: false
+  loop: "{{ secrets }}"

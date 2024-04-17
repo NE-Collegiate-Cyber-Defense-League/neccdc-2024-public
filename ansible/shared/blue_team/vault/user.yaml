@@ -1,0 +1,27 @@
+#
+# Blue Team User Configuration
+# The only modification required here is to change the mount_name variable to match the host.
+#
+---
+# Include the shared centralized credentials
+- name: BlueTeam - Include centralized credentials
+  include_vars: ../credentials.yml
+
+# Load the specified user from the credentials
+- name: BlueTeam - Set user fact from credentials
+  set_fact:
+    user: "{{ secrets | selectattr('mount', 'match', mount_name) | selectattr('path', 'match', 'Host Access') | first }}"
+  vars:
+    mount_name: Vault
+
+# Configure the defined user
+- name: BlueTeam - Configure the vault user
+  ansible.builtin.user:
+    name: "{{ user.data.username }}"
+    password: "{{ user.data.password | password_hash('sha256') }}"
+    create_home: true
+    shell: /usr/local/bin/bash
+    groups: wheel
+    append: yes
+    update_password: always
+    state: present

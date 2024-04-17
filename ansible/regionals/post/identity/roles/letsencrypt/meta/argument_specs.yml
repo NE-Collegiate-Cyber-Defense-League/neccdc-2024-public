@@ -1,0 +1,41 @@
+# roles/myapp/meta/argument_specs.yml
+---
+argument_specs:
+  # roles/myapp/tasks/main.yml entry point
+  main:
+    short_description: The main entry point for letsencrypt role.
+    options:
+      letsencrypt_cert_dir:
+        type: "str"
+        description: "The directory for storing all the certificates."
+        required: false
+
+      letsencrypt_install_ca:
+        type: "bool"
+        description: "Install the letsencrypt CA and Intermediate certificates"
+        required: false
+
+      letsencrypt_ca_list:
+        type: "list"
+        description: "List of the CA and Intermediate certificates to download."
+        required: false
+
+      letsencrypt_install_cert:
+        type: "bool"
+        description: "Install the private certificate and private key."
+        required: false
+
+      letsencrypt_bundle_path:
+        type: "str"
+        description: "Path to location of private SSL certificate and key."
+        required: false
+
+      letsencrypt_cert_name:
+        type: "str"
+        description: "Name of SSL certificate FILE to copy."
+        required: false
+
+      letsencrypt_key_name:
+        type: "str"
+        description: "Name of SSL key FILE to copy."
+        required: false

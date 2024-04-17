@@ -1,0 +1,52 @@
+---
+- name: Create a Longhorn namespace
+  become: true
+  become_user: ubuntu
+  kubernetes.core.k8s:
+    name: longhorn-system
+    api_version: v1
+    kind: Namespace
+    state: present
+  tags:
+    - services
+    - longhorn
+
+# https://longhorn.io
+# https://artifacthub.io/packages/helm/longhorn/longhorn
+- name: Create Longhorn ArgoCD application
+  become: true
+  become_user: ubuntu
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: argoproj.io/v1alpha1
+      kind: Application
+      metadata:
+        name: longhorn
+        namespace: argocd
+      spec:
+        project: default
+        source:
+          chart: longhorn
+          repoURL: https://charts.longhorn.io
+          targetRevision: '1.6.0'
+          helm:
+            releaseName: longhorn
+            values: |
+              preUpgradeChecker:
+                jobEnabled: false
+              ingress:
+                enabled: true
+                ingressClassName: haproxy
+                host: "longhorn.{{ team_number }}.rust.energy"
+                tls: true
+        destination:
+          server: "https://kubernetes.default.svc"
+          namespace: longhorn-system
+        syncPolicy:
+          automated:
+            prune: true
+            selfHeal: true
+  tags:
+    - services
+    - longhorn

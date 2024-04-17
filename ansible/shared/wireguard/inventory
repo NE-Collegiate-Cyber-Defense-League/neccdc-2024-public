@@ -1,0 +1,1 @@
+wireguard ansible_ssh_host=vpn.rust.energy ansible_user=ubuntu

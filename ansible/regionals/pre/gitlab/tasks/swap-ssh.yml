@@ -1,0 +1,36 @@
+---
+# Set sshd to listen on port 2222
+- block:
+    - name: SSHConfig - Test connection to remote
+      ansible.builtin.ping:
+      register: ping_result
+      ignore_unreachable: true
+    
+    - name: SSHConfig - Assert that gitlab was reachable
+      assert:
+        that: ping_result.unreachable == false
+        msg: "Gitlab is not reachable"
+      when: ping_result.unreachable is defined
+    
+    - name: SSHConfig - Setup alternate SSH port
+      lineinfile:
+        dest: "/etc/ssh/sshd_config"
+        regexp: "^Port"
+        line: "Port {{ configured_port }}"
+    
+    - name: SSHConfig - Restart sshd
+      ansible.builtin.systemd_service:
+        name: sshd
+        state: restarted
+  rescue:
+    - name: SSHConfig - Set inventory ansible_port to alternate
+      set_fact:
+        ansible_port: 2222
+    - name: SSHConfig - Test connection to remote
+      ansible.builtin.ping:
+  always:
+    - name: SSHConfig - Set inventory ansible_port to alternate
+      set_fact:
+        ansible_port: 2222
+    - name: SSHConfig - Run deferred setup to gather facts
+      setup:

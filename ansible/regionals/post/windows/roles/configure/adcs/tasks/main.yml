@@ -1,0 +1,38 @@
+---
+- name: Copy CA certificate to the server
+  win_copy:
+    src: files/RustEnergyRootCA.p12
+    dest: C:\ProgramData
+    force: true
+
+- name: Ensure ADCS-Cert-Authority is installed
+  win_feature:
+    name: ADCS-Cert-Authority
+    state: present
+    include_management_tools: true
+
+- name: Ensure ADCS-Cert-Authority-Web-Enrollment is installed
+  win_feature:
+    name: ADCS-Web-Enrollment
+    state: present
+
+- name: Run the ADCS install script
+  ansible.windows.win_powershell:
+    script: "{{ lookup('file', 'files/install_ca.ps1') }}"
+    error_action: stop
+    parameters:
+      cert_file_password: "PASSWORD"
+  register: ca_result
+- debug: var=ca_result
+
+- name: Remove CA certificate from the server
+  ansible.windows.win_file:
+    path: C:\ProgramData\RustEnergyRootCA.p12
+    state: absent
+
+- name: Enable Web enrollement
+  ansible.windows.win_powershell:
+    script: "{{ lookup('file', 'files/install_web.ps1') }}"
+    error_action: stop
+  register: web_result
+- debug: var=web_result

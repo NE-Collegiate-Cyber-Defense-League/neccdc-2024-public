@@ -1,0 +1,52 @@
+---
+# https://github.com/containerd/containerd/blob/main/docs/getting-started.md
+- name: Cgroupreate an empty file for the Containerd module
+  ansible.builtin.copy:
+    content: ""
+    dest: /etc/modules-load.d/containerd.conf
+    force: false
+    mode: "0600"
+
+- name: Configure modules for Containerd
+  ansible.builtin.blockinfile:
+    path: /etc/modules-load.d/containerd.conf
+    block: |
+         overlay
+         br_netfilter
+
+- name: Download docker key
+  ansible.builtin.get_url:
+    url: https://download.docker.com/linux/ubuntu/gpg
+    dest: /etc/apt/keyrings/docker.asc
+
+- name: Add Docker's APT repository
+  ansible.builtin.apt_repository:
+    repo: "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+    state: present
+
+- name: Install Containerd
+  ansible.builtin.apt:
+    name: containerd.io
+    state: present
+
+- name: Create Containerd directory
+  ansible.builtin.file:
+    path: /etc/containerd
+    state: directory
+    mode: "0700"
+
+- name: Add Containerd configuration
+  ansible.builtin.shell: /usr/bin/containerd config default > /etc/containerd/config.toml
+
+- name: Configuring the systemd cgroup driver for Containerd
+  ansible.builtin.lineinfile:
+    path: /etc/containerd/config.toml
+    regexp: '            SystemdCgroup = false'
+    line: '            SystemdCgroup = true'
+
+- name: Enable the Containerd service and start it
+  ansible.builtin.systemd:
+    name: containerd
+    state: restarted
+    enabled: true
+    daemon-reload: true

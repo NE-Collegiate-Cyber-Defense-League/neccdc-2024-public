@@ -1,0 +1,10 @@
+version: '3'
+services:
+  openplc:
+    image: openplc:v3
+    ports:
+      - "8080:8080"
+    privileged: true
+    stdin_open: true
+    tty: true
+    restart: unless-stopped

@@ -1,0 +1,46 @@
+# Packer Vault
+---
+- hosts: all
+  gather_facts: false
+  become: true
+  become_method: su
+  become_user: root
+  vars:
+    ansible_interpreter_python_fallback:
+      - /usr/local/bin/python
+      - /usr/local/bin/python3
+      - /usr/local/bin/python3.9
+
+  tasks:
+    - name: Add python to BSD
+      ansible.builtin.raw: pkg install -y python
+
+    - name: Install packages for BSD
+      ansible.builtin.package:
+        name:
+          - bash
+          - sudo
+          - wget
+          - curl
+          - nano
+        state: present
+
+    - name: Include blackteam role
+      ansible.builtin.include_role:
+        name: "../../roles/blackteam"
+
+    # Modify kernel parameters to allow unprivileged ports
+    # Required for Vault User to run on port 80/443
+    - name: Allow unprivileged ports for user in sysctl
+      ansible.builtin.sysctl:
+        name: net.inet.ip.portrange.reservedhigh
+        value: 0
+        state: present
+
+    - name: Install Vault Role
+      ansible.builtin.include_role:
+        name: vault
+      vars:
+        vault_bsd_pkg: vault-1.14.1_1
+        vault_config_path: /usr/local/etc/vault.hcl
+        vault_data_dir: /var/db/vault

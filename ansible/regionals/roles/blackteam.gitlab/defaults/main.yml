@@ -1,0 +1,40 @@
+---
+# defaults file for gitlab2
+
+gitlab_domain: "gitlab"
+gitlab_ssl: false
+gitlab_create_self_signed_cert: false
+
+gitlab_external_domain: "gitlab.{{ gitlab_domain }}"
+gitlab_external_url: "{{ gitlab_ssl | ternary('https', 'http') }}://{{ gitlab_external_domain }}"
+
+gitlab_registry_domain: "registry.{{ gitlab_domain }}"
+gitlab_registry_url: "{{ gitlab_ssl | ternary('https', 'http') }}://{{ gitlab_registry_domain }}"
+
+gitlab_edition: gitlab-ce
+gitlab_version: "16.0.0-ce.0"
+gitlab_timezone: "America/New_York"
+
+# Root API access token is the same as the root password
+gitlab_root_password: "PASSWORD"
+gitlab_root_email: admin@example.com
+gitlab_pat_token: "API_TOKEN"
+
+gitlab_sshd:
+  enabled: true
+  listen_port: 22
+  generate_host_keys: false
+
+gitlab_letsencrypt:
+  enabled: false
+
+gitlab_letsencrypt_folder: 999
+
+gitlab_restart_handler_failed_when: 'gitlab_restart.rc != 0'
+
+gitlab_smtp_enabled: false
+
+gitlab_ldap_enabled: false
+gitlab_ldap:
+  user_filter: "(memberOf:1.2.840.113556.1.4.1941:=CN=Domain Users,CN=Users,DC=ad,DC=rust,DC=energy)"
+  base: "DC=ad,DC=rust,DC=energy"

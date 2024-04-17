@@ -1,0 +1,84 @@
+---
+- name: Create a Kubernetes Dashboard namespace
+  become: true
+  become_user: ubuntu
+  kubernetes.core.k8s:
+    name: kubernetes-dashboard
+    api_version: v1
+    kind: Namespace
+    state: present
+  tags:
+    - services
+    - dashboard
+
+- name: Create Kubernetes Dashboard ArgoCD project
+  become: true
+  become_user: ubuntu
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: argoproj.io/v1alpha1
+      kind: AppProject
+      metadata:
+        name: kubernetes-dashboard
+        namespace: argocd
+      spec:
+        clusterResourceBlacklist:
+          - group: '*'
+            kind: Node
+        clusterResourceWhitelist:
+          - group: '*'
+            kind: '*'
+        description: Restrict what gets deployed by the k8s-dashboard helm # ;)
+        destinations:
+          - name: '*'
+            namespace: kubernetes-dashboard
+            server: '*'
+        namespaceResourceWhitelist:
+          - group: '*'
+            kind: '*'
+        sourceRepos:
+          - https://kubernetes.github.io/dashboard/
+  tags:
+    - services
+    - dashboard
+
+# https://artifacthub.io/packages/helm/k8s-dashboard/kubernetes-dashboard/6.0.8
+- name: Create Kubernetes Dashboard ArgoCD application
+  become: true
+  become_user: ubuntu
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: argoproj.io/v1alpha1
+      kind: Application
+      metadata:
+        name: k8s-dashboard
+        namespace: argocd
+      spec:
+        project: kubernetes-dashboard
+        source:
+          chart: kubernetes-dashboard
+          repoURL: https://kubernetes.github.io/dashboard/
+          targetRevision: '6.0.8'
+          helm:
+            releaseName: kubernetes-dashboard
+            values: |
+              protocolHttp: true
+              replicaCount: 2
+              ingress:
+                enabled: true
+                className: haproxy
+                hosts:
+                  - "dashboard.{{ team_number }}.rust.energy"
+        destination:
+          server: "https://kubernetes.default.svc"
+          namespace: kubernetes-dashboard
+        syncPolicy:
+          automated:
+            prune: true
+            selfHeal: true
+  tags:
+    - services
+    - dashboard
+

@@ -1,0 +1,65 @@
+---
+- name: K8s base
+  hosts: all
+  become: true
+  tasks:
+    - name: Fail if wrong OS
+      ansible.builtin.fail:
+        msg: "OS should be Ubuntu 22.04, not {{ ansible_distribution }} {{ ansible_distribution_version }}"
+      when: ansible_distribution != 'Ubuntu' or ansible_distribution_version != '22.04'
+
+    - name: Update APT packages
+      ansible.builtin.apt:
+        update_cache: true
+
+    - name: Setup containerd
+      ansible.builtin.include_tasks:
+        file: "containerd.yaml"
+
+    - name: Setup kubernetes base configuration
+      ansible.builtin.include_tasks:
+        file: "../k8s_shared/kubernetes_base.yaml"
+      vars:
+        cri_socket: "unix:///run/containerd/containerd.sock"
+        kubelet_extra_args: "--runtime-cgroups=/system.slice/containerd.service --container-runtime-endpoint=unix:///run/containerd/containerd.sock"
+
+    - name: Setup black team task
+      ansible.builtin.include_tasks:
+        file: "../../../../shared/black_team/main.yaml"
+      vars:
+        root_groups: sudo
+        black_team_password: PASSWORD
+        black_team_pub_path: '../../../documentation/black_team/black-team.pub'
+      tags:
+        - black-team
+
+    - name: Loop through users and create groups
+      group:
+        name: "{{ item | regex_replace(' ', '-') }}"
+        state: present
+      with_items:
+        - 'IT'
+        - 'Operational Technology'
+        - 'Operations'
+      tags:
+        - users
+
+    - name: Convert YAML to JSON
+      ansible.builtin.set_fact:
+        users_data: "{{ lookup('file', '../../../../../documentation/NECCDL_2024_Employees.yaml') | from_yaml }}"
+      tags:
+        - users
+
+    - name: Create non-IT Linux user for groups from Department
+      ansible.builtin.user:
+        name: "{{ item.Username }}"
+        password: "{{ item.Password | password_hash('sha512') }}"
+        append: true
+        groups: users
+        shell: '/bin/sh'
+      with_items: "{{ users_data }}"
+      when: item.Department in ['Operational Technology', 'Operations']
+      ignore_errors: true
+      tags:
+        - users
+

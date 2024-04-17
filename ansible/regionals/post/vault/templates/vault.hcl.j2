@@ -1,0 +1,33 @@
+ui            = true
+disable_mlock = true
+
+storage "file" {
+  path    = "/var/db/vault"
+}
+
+listener "tcp" {
+  address         = "[::]:8200"
+  cluster_address = "[::]:8201"
+  tls_disable     = "true"
+}
+
+listener "tcp" {
+  address         = "[::]:443"
+  api_addr        = "[::]:443"
+  cluster_address = "[::]:444"
+
+  tls_cert_file = "/usr/local/etc/vault.crt"
+  tls_key_file  = "/usr/local/etc/vault.key"
+
+  telemetry {
+    unauthenticated_metrics_access = true
+  }
+
+  profiling {
+    unauthenticated_pprof_access = true
+  }
+}
+
+user_lockout "all" {
+    disable_lockout = true
+}

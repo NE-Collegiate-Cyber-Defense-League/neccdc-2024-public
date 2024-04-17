@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Black Team Store</title>
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<h1>Black Team Store</h1>
+
+<form id="sale-items-form">
+    <div class="item" onclick="selectItem('item1')">
+        <input type="radio" id="item1" name="selectedItem" value="1" style="display: none">
+        <label for="item1">
+            <h3>Tip</h3>
+            <p>Just a tech tip</p>
+            <span class="price">5.00</span>
+        </label>
+    </div>
+
+    <div class="item" onclick="selectItem('item2')">
+        <input type="radio" id="item2" name="selectedItem" value="2" style="display: none">
+        <label for="item2">
+            <h3>Riddle</h3>
+            <p>Riddle me this</p> <!-- batman -->
+            <span class="price">10.00</span>
+        </label>
+    </div>
+
+    <div class="item" onclick="selectItem('item3')">
+        <input type="radio" id="item3" name="selectedItem" value="3" style="display: none">
+        <label for="item3">
+            <h3>Sticker</h3>
+            <p>A sticker hand selected by black team and then shipped overseas</p> <!-- Should have filled out our form :D -->
+            <span class="price">20.00</span>
+        </label>
+    </div>
+
+    <div class="item" onclick="selectItem('item4')">
+        <input type="radio" id="item4" name="selectedItem" value="4" style="display: none">
+        <label for="item4">
+            <h3>Gaff Tap</h3>
+            <p>Just gaff tap</p>
+            <span class="price">25.00</span>
+        </label>
+    </div>
+
+    <div class="item" onclick="selectItem('item5')">
+        <input type="radio" id="item5" name="selectedItem" value="5" style="display: none">
+        <label for="item5">
+            <h3>Hangout</h3>
+            <p>We'll give a single individual five minutes of our time. Just chatting, not comp help</p> <!-- Feel free to hangout during lunch w/ us & any other time outside of the comp 🥺👉👈 -->
+            <span class="price">50.00</span>
+        </label>
+    </div>
+
+    <div class="item" onclick="selectItem('item6')">
+        <input type="radio" id="item6" name="selectedItem" value="6" style="display: none">
+        <label for="item6">
+            <h3>Elevator Pass</h3>
+            <p>Yes</p>
+            <span class="price">100.00</span>
+        </label>
+    </div>
+
+    <div id="purchase-section" style="display: none;">
+        <hr>
+        <h2>Purchase Section</h2>
+        <input type="text" id="coupon-code" placeholder="Enter team token">
+        <button type="button" onclick="purchase()">Purchase</button>
+    </div>
+</form>
+
+<script src="script.js"></script> 
+
+</body>
+</html>

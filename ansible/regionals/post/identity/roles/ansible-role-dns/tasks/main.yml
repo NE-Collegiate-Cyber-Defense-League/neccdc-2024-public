@@ -1,0 +1,60 @@
+---
+- name: Check if we are running supported os
+  ansible.builtin.assert:
+    fail_msg: "{{ role_name }} only supports ubuntu versions 16, 18, 20, 22,   centos versions 7, centos strem versions 8, rhel versions 8, 9!"
+    success_msg: "{{ role_name }} supports {{ ansible_distribution }} version {{ ansible_distribution_version }}"
+    quiet: "{{ not ansible_check_mode }}"
+    that:
+      ( ansible_distribution == "Ubuntu" and ansible_distribution_version|int in [16, 18, 20, 22] )
+      or ( ansible_distribution == "CentOS" and ansible_distribution_major_version|int in [7, 8] )
+      or ( ansible_distribution == "RedHat" and ansible_distribution_major_version|int in [8, 9] )
+      or ( ansible_distribution == "Fedora" and ansible_distribution_major_version|int in [38, 39] )
+
+## systemd-resolved
+
+- name: Check if systemd-resolved config exists
+  ansible.builtin.stat:
+    path: /etc/systemd/resolved.conf
+  register: systemd_resolved_config
+  check_mode: false
+
+- name: Update DNS servers for systemd-resolvd
+  ansible.builtin.include_tasks:
+    file: 'systemd-resolved.yml'
+  when: systemd_resolved_config.stat.exists | bool
+
+## network-manager
+
+- name: Check if network manager exists
+  ansible.builtin.stat:
+    path: /etc/NetworkManager/conf.d
+  register: network_manager_config
+  check_mode: false
+
+- name: Configure network manager
+  ansible.builtin.include_tasks:
+    file: 'network-manager.yml'
+  when: network_manager_config.stat.exists
+
+## resolvconf and others
+
+- name: Check if network manager runs
+  ansible.builtin.shell: pgrep NetworkManager
+  failed_when: false
+  changed_when: false
+  register: network_manager_running
+  check_mode: false
+
+- name: Check if network manager runs
+  ansible.builtin.shell: pgrep systemd-resolve
+  failed_when: false
+  changed_when: false
+  register: systemd_resolved_running
+  check_mode: false
+
+- name: Resolvconf configuration
+  ansible.builtin.include_tasks:
+    file: 'resolvconf.yml'
+  when:
+    - network_manager_running.rc != 0
+    - systemd_resolved_running.rc != 0

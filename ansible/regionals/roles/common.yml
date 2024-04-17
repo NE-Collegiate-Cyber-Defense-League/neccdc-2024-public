@@ -1,0 +1,11 @@
+---
+team: "{{ inventory_hostname.split('.')[-3] }}"
+adserver_ip: "10.{{ inventory_hostname.split('.')[-3] }}.1.1"
+ipaserver_ip: "10.{{ team }}.128.132"
+dns_servers:
+  - "10.{{ team }}.128.132"
+  - "10.{{ team }}.1.1"
+  - "10.{{ team }}.0.2"
+dns_search:
+  - "{{ ipaserver_domain }}"
+  - "us-east-2.compute.internal"

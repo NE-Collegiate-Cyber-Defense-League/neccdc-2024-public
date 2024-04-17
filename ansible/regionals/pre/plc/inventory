@@ -1,0 +1,2 @@
+# ansible-playbook playbook.yaml -i inventory --private-key=~/.ssh/black-team
+plc ansible_ssh_host=10.0.169.169 ansible_user=ec2-user

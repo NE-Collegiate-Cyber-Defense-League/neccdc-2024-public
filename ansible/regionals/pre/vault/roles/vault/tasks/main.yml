@@ -1,0 +1,159 @@
+# Role Vault
+---
+################################
+# Installing vault
+################################
+# Note: this package version has broken ui so we replace it with good one
+# The reason we use the package is because it setups all BSD services, etc.
+- name: Install BROKEN vault binary
+  ansible.builtin.package:
+    name: "{{ vault_bsd_pkg }}"
+    state: present
+
+- name: Download GOOD vault binary
+  ansible.builtin.unarchive:
+    remote_src: true
+    src: "https://releases.hashicorp.com/vault/{{ vault_version }}/vault_{{ vault_version }}_freebsd_amd64.zip"
+    dest: /usr/local/bin
+    owner: root
+    group: wheel
+    mode: 0755
+
+- name: Create Vault data and configuration directories
+  file:
+    path: "{{ vault_data_dir }}"
+    state: directory
+    owner: vault
+    group: wheel
+    mode: 0750
+
+- name: Create vault configuration file
+  template:
+    src: vault.hcl.j2
+    dest: "{{ vault_config_path }}"
+    owner: vault
+    group: wheel
+    mode: 0640
+
+- name: Enable vault service
+  ansible.builtin.service:
+    name: vault
+    enabled: true
+    state: started
+
+################################
+# Initializing vault
+################################
+- name: Initializing vault using api call
+  uri:
+    url: "{{ vault_url }}/v1/sys/init"
+    method: POST
+    body:
+      secret_shares: 4
+      secret_threshold: 2
+    body_format: json
+    status_code: 200
+    validate_certs: false
+  register: response
+
+- name: Print the response
+  debug:
+    var: response
+
+- name: Create custom fact
+  set_fact:
+    vault_json:
+      vault_access: "{{ response.json }}"
+
+- name: Save JSON response to file
+  copy:
+    content: "{{ vault_json | to_nice_json }}"
+    dest:  ../../../../documentation/blue_team_access/regionals/vault_access.json
+  delegate_to: localhost
+
+################################
+# Seal Management for vault
+################################
+- name: Create custom fact
+  set_fact:
+    vault_access: "{{ response.json }}"
+
+# Can keep the seal management here but also can be added to packer
+# Seal Management for vault
+- name: Check if Vault is sealed
+  uri:
+    url: "{{ vault_url }}/v1/sys/seal-status"
+    method: GET
+    validate_certs: false
+  register: seal_status
+
+- name: Send unseal keys to Vault
+  uri:
+    url: "{{ vault_url }}/v1/sys/unseal"
+    method: POST
+    body_format: json
+    body:
+      key: "{{ item }}"
+    validate_certs: false
+  with_items: "{{ vault_access['keys'][:2] }}"
+  when: seal_status.json.sealed == true
+
+################################
+# Setup Vault auth methods
+################################
+# Userpass auth method
+- name: Get the list of auth methods
+  uri:
+    url: "{{ vault_url }}/v1/sys/auth"
+    method: GET
+    headers:
+      X-Vault-Token: "{{ vault_access['root_token'] }}"
+    validate_certs: false
+  register: auth_methods
+
+- name: Enable userpass auth method if it does not exist
+  uri:
+    url: "{{ vault_url }}/v1/sys/auth/userpass"
+    method: POST
+    headers:
+      X-Vault-Token: "{{ vault_access['root_token'] }}"
+    body_format: json
+    body:
+      type: "userpass"
+      description: "userpass auth method"
+    status_code: [200, 204]
+    validate_certs: false
+  when: auth_methods.json.data['userpass/'] is not defined
+
+################################
+# Add policies
+################################
+# Manage vault policies
+- name: Create the superuser policy
+  uri:
+    url: "{{ vault_url }}/v1/sys/policy/superuser"
+    method: POST
+    headers:
+      X-Vault-Token: "{{ vault_access['root_token'] }}"
+    body_format: json
+    body:
+      policy: "{{ lookup('file', 'files/superuser-policy.hcl') }}"
+    status_code: [200, 204]
+    validate_certs: false
+
+################################
+# Create userpass users with admin policy
+################################
+- name: Create userpass user
+  uri:
+    url: "{{ vault_url }}/v1/auth/userpass/users/{{ item.name }}"
+    method: POST
+    headers:
+      X-Vault-Token: "{{ vault_access['root_token'] }}"
+    body_format: json
+    body:
+      password: "{{ item.password }}"
+      policies: ["superuser"]
+    status_code: [200, 204]
+    validate_certs: false
+  loop: "{{ users }}"

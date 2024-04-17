@@ -1,0 +1,145 @@
+---
+- name: Packer SIEM
+  hosts: all
+  become: true
+  tasks:
+    - name: Upgrade all packages
+      ansible.builtin.dnf:
+        name: "*"
+        state: latest
+
+    - name: Install packages
+      ansible.builtin.dnf:
+        name:
+          - ipa-client
+          - samba-client
+          - firewalld
+        state: present
+
+    - name: Enable Firewalld
+      ansible.builtin.service:
+        name: firewalld
+        enabled: true
+        state: started
+
+    - name: Download and install amazon-ssm-agent rpm package
+      ansible.builtin.dnf:
+        name: "https://s3.amazonaws.com/ec2-downloads-windows/SSMAgent/latest/linux_amd64/amazon-ssm-agent.rpm"
+        disable_gpg_check: true
+
+    - name: Enable Amazon SSM Agent service
+      ansible.builtin.service:
+        name: amazon-ssm-agent
+        enabled: true
+        state: started
+
+    - name: Include blackteam role
+      ansible.builtin.include_role:
+        name: "../../roles/blackteam"
+
+    - name: Enable ports required for wazuh
+      ansible.posix.firewalld:
+        port: "{{ item }}"
+        permanent: true
+        immediate: true
+        offline: true
+        state: enabled
+      loop:
+        - 80/tcp
+        - 443/tcp
+        - 514/udp
+        - 514/tcp
+        - 1514/udp
+        - 1514-1516/tcp
+        - 9200/tcp
+        - 9300-9400/tcp
+        - 55000/tcp
+
+- name: Certificates generation
+  hosts: all
+  become: false
+
+  pre_tasks:
+    # Include the shared centralized credentials
+    - name: BlueTeam - Include centralized credentials
+      include_vars: ../../../shared/blue_team/credentials.yml
+
+    # Load the specified user from the credentials
+    - name: BlueTeam - Set user fact from credentials
+      set_fact:
+        wazuh_dashboard: "{{ secrets | selectattr('path', 'match', path_name) | first }}"
+      vars:
+        path_name: "Wazuh Dashboard"
+
+    - name: BlueTeam - Set user fact from credentials
+      set_fact:
+        wazuh_indexer: "{{ secrets | selectattr('path', 'match', path_name) | first }}"
+      vars:
+        path_name: "Wazuh Indexer"
+
+  roles:
+    - role: "{{ playbook_dir }}/roles/wazuh/wazuh-indexer"
+      perform_installation: false
+  vars:
+    dashboard_user: "{{ wazuh_dashboard.data.username }}"
+    dashboard_password: "{{ wazuh_dashboard.data.password }}"
+    indexer_admin_password: "{{ wazuh_indexer.data.password }}"
+    indexer_security_user: "{{ wazuh_indexer.data.username }}"
+    indexer_security_password: "{{ wazuh_indexer.data.password }}"
+    indexer_node_master: true
+    instances:
+      wazuh:
+        name: wazuh
+        ip: 127.0.0.1
+        role: indexer 
+
+- name: Install wazuh
+  hosts: all
+  become: true
+
+  pre_tasks:
+    # Include the shared centralized credentials
+    - name: BlueTeam - Include centralized credentials
+      include_vars: ../../../shared/blue_team/credentials.yml
+
+    # Load the specified user from the credentials
+    - name: BlueTeam - Set user fact from credentials
+      set_fact:
+        wazuh_dashboard: "{{ secrets | selectattr('path', 'match', path_name) | first }}"
+      vars:
+        path_name: "Wazuh Dashboard"
+
+    - name: BlueTeam - Set user fact from credentials
+      set_fact:
+        wazuh_indexer: "{{ secrets | selectattr('path', 'match', path_name) | first }}"
+      vars:
+        path_name: "Wazuh Indexer"
+
+  roles:
+    - role: "{{ playbook_dir }}/roles/wazuh/wazuh-indexer"
+    - role: "{{ playbook_dir }}/roles/wazuh/ansible-wazuh-manager"
+    - role: "{{ playbook_dir }}/roles/wazuh/ansible-filebeat-oss"
+    - role: "{{ playbook_dir }}/roles/wazuh/wazuh-dashboard"
+  vars:
+    single_node: true
+    minimum_master_nodes: 1
+    indexer_node_master: true
+    indexer_network_host: 127.0.0.1
+    indexer_jvm_xms: 4096
+    indexer_node_name: wazuh
+    filebeat_node_name: wazuh
+    dashboard_node_name: wazuh
+    dashboard_user: "{{ wazuh_dashboard.data.username }}"
+    dashboard_password: "{{ wazuh_dashboard.data.password }}"
+    indexer_admin_password: "{{ wazuh_indexer.data.password }}"
+    indexer_security_user: "{{ wazuh_indexer.data.username }}"
+    indexer_security_password: "{{ wazuh_indexer.data.password }}"
+    filebeat_output_indexer_hosts:
+      - 127.0.0.1
+    instances:
+      wazuh:
+        name: wazuh
+        ip: 127.0.0.1
+        role: indexer
+    ansible_shell_allow_world_readable_temp: true
+

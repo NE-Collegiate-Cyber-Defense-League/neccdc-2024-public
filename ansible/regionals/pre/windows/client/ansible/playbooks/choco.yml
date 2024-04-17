@@ -1,0 +1,70 @@
+---
+- name: Install googlechrome
+  chocolatey.chocolatey.win_chocolatey:
+    name: googlechrome
+    state: present
+
+- name: Install firefox
+  chocolatey.chocolatey.win_chocolatey:
+    name: firefox
+    version: '122.0.0'
+    state: present
+
+- name: Install 7zip
+  chocolatey.chocolatey.win_chocolatey:
+    name: 7zip
+    version: '23.1.0'
+    state: present
+
+- name: Install vlc
+  chocolatey.chocolatey.win_chocolatey:
+    name: vlc
+    version: '3.0.20'
+    state: present
+
+- name: Install notepadplusplus
+  chocolatey.chocolatey.win_chocolatey:
+    name: notepadplusplus
+    version: '8.6.2'
+    state: present
+
+- name: Install winscp
+  chocolatey.chocolatey.win_chocolatey:
+    name: winscp
+    version: '6.1.2'
+    state: present
+
+- name: Install git
+  chocolatey.chocolatey.win_chocolatey:
+    name: git
+    version: '2.43.0'
+    state: present
+
+- name: Install python
+  chocolatey.chocolatey.win_chocolatey:
+    name: python
+    version: '3.12.1'
+    state: present
+
+- name: Install microsoft-edge-insider
+  chocolatey.chocolatey.win_chocolatey:
+    name: microsoft-edge-insider
+    state: present
+
+- name: Install opennbs
+  chocolatey.chocolatey.win_chocolatey:
+    name: opennbs
+    version: '3.10.0'
+    state: present
+
+- name: Install amidst
+  chocolatey.chocolatey.win_chocolatey:
+    name: amidst
+    version: '4.7'
+    state: present
+
+- name: Install obs-studio
+  chocolatey.chocolatey.win_chocolatey:
+    name: obs-studio
+    version: '30.0.2'
+    state: present

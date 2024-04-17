@@ -1,0 +1,87 @@
+---
+- name: Install HAProxy ingress
+  ansible.builtin.include_tasks:
+    file: "tasks/haproxy_ingress.yaml"
+  tags:
+    - services
+    - ingress
+
+- name: Install ArgoCD
+  ansible.builtin.include_tasks:
+    file: "tasks/argocd.yaml"
+  tags:
+    - services
+    - argocd
+
+- name: Install Longhorn ingress
+  ansible.builtin.include_tasks:
+    file: "tasks/longhorn.yaml"
+  tags:
+    - services
+    - longhorn
+
+- name: Install Falco
+  ansible.builtin.include_tasks:
+    file: "tasks/falco.yaml"
+  tags:
+    - services
+    - falco
+
+- name: Deploy postgreSQL
+  ansible.builtin.include_tasks:
+    file: "tasks/postgres.yaml"
+  vars:
+    postgresql_password: PASSWORD
+    postgresql_disk_size: 4Gi
+  tags:
+    - services
+    - database
+
+- name: Deploy code server
+  ansible.builtin.include_tasks:
+    file: "tasks/code.yaml"
+  tags:
+    - services
+    - code
+
+- name: Deploy kubernetes dashboard
+  ansible.builtin.include_tasks:
+    file: "tasks/k8s_dashboard.yaml"
+  tags:
+    - services
+    - dashboard
+
+- name: Deploy nextcloud
+  ansible.builtin.include_tasks:
+    file: "tasks/nextcloud.yaml"
+  tags:
+    - services
+    - nextcloud
+
+- name: Kubernetes filler
+  ansible.builtin.include_tasks:
+    file: "tasks/k8s_filler.yaml"
+  tags:
+    - services
+    - filler
+
+- name: GitLab ArgoCD applications
+  ansible.builtin.include_tasks:
+    file: "tasks/gitlab_apps.yaml"
+  tags:
+    - services
+    - gitlab_apps
+
+- name: Tethys inject pre recs
+  ansible.builtin.include_tasks:
+    file: "tasks/tethys_inject.yaml"
+  tags:
+    - services
+    - tethys
+
+- name: Deploy dammon
+  ansible.builtin.include_tasks:
+    file: "tasks/dammon.yaml"
+  tags:
+    - services
+    - dammon

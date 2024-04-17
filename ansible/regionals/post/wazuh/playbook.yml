@@ -1,0 +1,51 @@
+- name: Wazuh Post Install
+  hosts: wazuh
+  become: true
+  gather_facts: false
+  vars:
+    ssl_cert: "/etc/wazuh-dashboard/certs/fullerchain.crt"
+    ssl_key: "/etc/wazuh-dashboard/certs/privkey.key"
+  vars_files:
+    - "../../roles/common.yml"
+  
+  tasks:
+    - name: Include host setup role
+      ansible.builtin.include_role:
+        name: "../../roles/hostsetup"
+      vars:
+        hostsetup_hostname: "{{ hostname }}"
+        hostsetup_fqdn: "{{ hostname }}.{{ ipaserver_domain }}"
+        hostsetup_timezone: "America/New_York"
+
+    - name: Include blue_team access
+      ansible.builtin.include_tasks:
+        file: "../../../shared/blue_team/wazuh/user.yaml"
+    
+    - name: Copy the TLS certificate
+      ansible.builtin.copy:
+        src: "../../../../documentation/certs/regionals/team_{{ team }}/fullchain.crt"
+        dest: "{{ ssl_cert }}"
+        owner: wazuh-dashboard
+        group: wazuh-dashboard
+        mode: 0440
+
+    - name: Copy the TLS key
+      ansible.builtin.copy:
+        src: "../../../../documentation/certs/regionals/team_{{ team }}/private.key"
+        dest: "{{ ssl_key }}"
+        owner: wazuh-dashboard
+        group: wazuh-dashboard
+        mode: 0440
+    
+    - name: Template the Wazuh configuration
+      ansible.builtin.template:
+        src: opensearch_dashboards.yml.j2
+        dest: /etc/wazuh-dashboard/opensearch_dashboards.yml
+        owner: wazuh-dashboard
+        group: wazuh-dashboard
+        mode: 0640
+    
+    - name: Restart Wazuh dashboard service
+      ansible.builtin.systemd:
+        name: wazuh-dashboard
+        state: restarted

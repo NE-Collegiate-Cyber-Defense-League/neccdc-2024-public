@@ -1,0 +1,12 @@
+nodes:
+  # Indexer server nodes
+  indexer:
+    - name: wazuh
+      ip: 127.0.0.1
+
+  # Wazuh server nodes
+  # Use node_type only with more than one Wazuh manager
+  server:
+
+  # Dashboard node
+  dashboard:

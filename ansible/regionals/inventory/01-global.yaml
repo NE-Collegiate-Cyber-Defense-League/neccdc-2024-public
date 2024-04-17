@@ -1,0 +1,78 @@
+cluster:
+  children:
+    ctrl_plane:
+    node_1:
+    node_2:
+    node_3:
+  vars:
+    ansible_user: black-team
+    ansible_private_key_file: ~/.ssh/black-team
+    ansible_port: 22
+
+nodes:
+  children:
+    node_1:
+    node_2:
+    node_3:
+
+linux:
+  children:
+    identity:
+    gitlab:
+    wazuh:
+  vars:
+    ansible_user: black-team
+    ansible_private_key_file: ~/.ssh/black-team
+
+ubuntu:
+  children:
+    cluster:
+    gitlab:
+
+rhel:
+  children:
+    identity:
+    wazuh:
+
+opensuse:
+  children:
+    plc:
+  vars:
+    ansible_user: black-team
+    ansible_private_key_file: ~/.ssh/id_rsa
+    ansible_python_interpreter: /usr/bin/python3
+
+freebsd:
+  children:
+    vault:
+  vars:
+    ansible_user: black-team
+    ansible_private_key_file: ~/.ssh/id_rsa
+    ansible_become_user: root
+    ansible_become_method: su
+    ansible_interpreter_python_fallback:
+      - /usr/local/bin/python
+      - /usr/local/bin/python3
+      - /usr/local/bin/python3.9
+
+plc_relay:
+  hosts:
+    0.0.0.0 # PLC-Relay IP goes here
+  vars:
+    ansible_user: ubuntu
+    ansible_private_key_file: ~/.ssh/black-team
+
+scorestack:
+  hosts:
+    0.0.0.0 # Scorestack IP goes here
+  vars:
+    ansible_user: ubuntu
+    ansible_private_key_file: ~/.ssh/black-team
+
+all:
+  vars:
+    adserver_domain: ad.rust.energy
+    adserver_password: PASSWORD
+    ipaserver_domain: id.rust.energy
+    ipaadmin_password: PASSWORD
+

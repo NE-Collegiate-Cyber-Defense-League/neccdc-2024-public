@@ -1,0 +1,49 @@
+---
+- name: Create a Falco namespace
+  become: true
+  become_user: ubuntu
+  kubernetes.core.k8s:
+    name: falco
+    api_version: v1
+    kind: Namespace
+    state: present
+  tags:
+    - services
+    - falco
+
+# https://artifacthub.io/packages/helm/falcosecurity/falco
+- name: Create Falco ArgoCD application
+  become: true
+  become_user: ubuntu
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: argoproj.io/v1alpha1
+      kind: Application
+      metadata:
+        name: falco
+        namespace: argocd
+      spec:
+        project: default
+        source:
+          chart: falco
+          repoURL: https://falcosecurity.github.io/charts
+          targetRevision: '4.1.1'
+          helm:
+            releaseName: falco
+            values: |
+              serviceAccount:
+                create: true
+              tty: true
+              driver:
+                kind: ebpf
+        destination:
+          server: "https://kubernetes.default.svc"
+          namespace: falco
+        syncPolicy:
+          automated:
+            prune: true
+            selfHeal: true
+  tags:
+    - services
+    - falco

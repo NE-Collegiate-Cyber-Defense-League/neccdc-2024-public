@@ -1,0 +1,70 @@
+---
+- name: Automated Setup of Active Directory Users and Groups
+  hosts: win_dc
+  gather_facts: false
+  vars:
+    ansible_user: "administrator@{{ adserver_domain }}"
+    csv_src: ../files/populate/users.csv
+    csv_dest: C:\users.csv
+    gpo_src: ../files/populate/gpo
+    gpo_dest: C:\temp
+    bginfo_src: ../files/populate/BGInfo.zip
+    bginfo_dest: C:\Windows\SYSVOL\domain\scripts
+    ipaserver_ip: "10.{{ inventory_hostname.split('.')[-3] }}.128.132"
+
+  tasks:
+    - name: Setup DNS Forwarder for Identity
+      community.windows.win_dns_zone:
+        name: "{{ ipaserver_domain }}"
+        type: forwarder
+        replication: forest
+        state: present
+        dns_servers:
+          - "{{ ipaserver_ip }}"
+
+    - name: Transfer User Data CSV to Target Server
+      ansible.windows.win_copy:
+        src: "{{ csv_src }}"
+        dest: "{{ csv_dest }}"
+
+    - name: Transfer GPOs to Target Server
+      ansible.windows.win_copy:
+        src: "{{ gpo_src }}"
+        dest: "{{ gpo_dest }}"
+
+    - name: Transfer BGInfo to Target Server
+      ansible.windows.win_copy:
+        src: "{{ bginfo_src }}"
+        dest: "{{ bginfo_dest }}"    
+
+    - name: Extract BGInfo
+      community.windows.win_unzip:
+        src: C:\Windows\SYSVOL\domain\scripts\BGInfo.zip
+        dest: C:\Windows\SYSVOL\domain\scripts\BGInfo
+        delete_archive: yes 
+
+    - name: Ensure GPO features are installed
+      ansible.windows.win_feature:
+        name: GPMC
+        state: present
+
+    - name: Run Active Directory Configuration Script
+      ansible.windows.win_powershell:
+        script: "{{ lookup('file', '../files/populate/populate.ps1') }}"
+        parameters:
+          CreateOUs: true
+          CreateUsers: true
+          CreateGroups: true
+          CreateGPOs: true
+      register: script_result
+    - debug: var=script_result.output
+    
+    - name: "Clean up: Remove CSV File from Server"
+      ansible.windows.win_file:
+        path: "{{ csv_dest }}"
+        state: absent
+
+    - name: "Clean up: Remove Temp Folder from Server"
+      ansible.windows.win_file:
+        path: "{{ gpo_dest }}"
+        state: absent

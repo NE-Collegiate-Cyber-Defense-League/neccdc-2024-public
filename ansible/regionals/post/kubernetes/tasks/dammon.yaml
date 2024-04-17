@@ -1,0 +1,120 @@
+---
+- name: Create dammon configmap
+  become: true
+  become_user: ubuntu
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: dammon-configurations
+        namespace: prod
+        labels:
+          app: dammon
+      data:
+        PLC_IP_ADDRESS: 10.{{ team_number }}.169.169
+        PLC_TCP_PORT: "300{{ '%02d' | format(team_number | int) }}"
+  tags:
+    - services
+    - dammon
+
+- name: Create dammon deployment
+  become: true
+  become_user: ubuntu
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: apps/v1
+      kind: Deployment
+      type: Opaque
+      metadata:
+        name: dammon
+        namespace: prod
+        labels:
+          app: dammon
+      spec:
+        replicas: 3
+        selector:
+          matchLabels:
+            app: dammon
+        template:
+          metadata:
+            labels:
+              app: dammon
+          spec:
+            restartPolicy: Always
+            containers:
+              - name: dammon
+                image: public.ecr.aws/t2h3m3k6/dammon:latest
+                ports:
+                  - containerPort: 5000
+                envFrom:
+                  - configMapRef:
+                      name: dammon-configurations
+                resources:
+                  requests:
+                    memory: "50Mi"
+                    cpu: 100m
+                  limits:
+                    memory: "200Mi"
+                    cpu: 100m
+  tags:
+    - services
+    - dammon
+
+- name: Create dammon service
+  become: true
+  become_user: ubuntu
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Service
+      metadata:
+        name: dammon-svc
+        namespace: prod
+        labels:
+          app: dammon
+      spec:
+        type: ClusterIP
+        selector:
+          app: dammon
+        ports:
+          - name: http
+            port: 5000
+            protocol: TCP
+            targetPort: 5000
+  tags:
+    - services
+    - dammon
+
+- name: Create dammon ingress
+  become: true
+  become_user: ubuntu
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: networking.k8s.io/v1
+      kind: Ingress
+      metadata:
+        name: dammon-webapp
+        namespace: prod
+        labels:
+          app: dammon
+      spec:
+        ingressClassName: haproxy
+        rules:
+          - host: "dammon.{{ team_number }}.rust.energy"
+            http:
+              paths:
+                - backend:
+                    service:
+                      name: dammon-svc
+                      port:
+                        number: 5000
+                  path: /
+                  pathType: Prefix
+  tags:
+    - services
+    - dammon

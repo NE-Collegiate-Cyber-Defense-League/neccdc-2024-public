@@ -1,0 +1,9 @@
+---
+- name: Run Certificate template script
+  ansible.windows.win_powershell:
+    script: "{{ lookup('file', 'files/template.ps1') }}"
+    parameters:
+      DisplayName: "{{ template_display_name }}"
+      Identities: "{{ template_identities }}"
+  register: template_result
+- debug: var=template_result

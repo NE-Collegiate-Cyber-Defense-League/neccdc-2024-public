@@ -1,0 +1,22 @@
+---
+- name: Configure Windows CA
+  hosts: win_ca
+  gather_facts: false
+  vars:
+    ansible_become: true
+    ansible_become_method: runas
+    ansible_become_user: AD\Administrator
+    ansible_become_password: "{{ adserver_password }}"
+
+  tasks:
+    - name: Include ADCS role
+      ansible.builtin.include_role:
+        name: ../roles/configure/adcs
+
+    - name: Setup IIS certificate template
+      ansible.builtin.include_role:
+        name: ../roles/configure/adcs_template
+      vars:
+        template_display_name: IIS Web Server
+        template_identities:
+          - "WIN-WEB$" # The domain joined server allowed to request the template

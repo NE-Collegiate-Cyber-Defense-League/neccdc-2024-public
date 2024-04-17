@@ -1,0 +1,22 @@
+---
+- name: K8s base
+  hosts: all
+  become: true
+  tasks:
+    - name: Fail if wrong OS
+      ansible.builtin.fail:
+        msg: "OS should be Ubuntu 22.04, not {{ ansible_distribution }} {{ ansible_distribution_version }}"
+      when: ansible_distribution != 'Ubuntu' or ansible_distribution_version != '22.04'
+
+    - name: Setup ctrl plane configurations
+      ansible.builtin.include_tasks:
+        file: "ctrl_config.yaml"
+      vars:
+        cri_socket: "unix:///run/containerd/containerd.sock"
+
+    # So much nice stuff ☺️
+    - name: Setup kubernetes nice to haves
+      ansible.builtin.include_tasks:
+        file: "controller_nice.yaml"
+      tags:
+        - crictl

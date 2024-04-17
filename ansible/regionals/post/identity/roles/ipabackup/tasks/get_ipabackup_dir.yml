@@ -1,0 +1,8 @@
+---
+- name: Get IPA_BACKUP_DIR from ipaplatform
+  freeipa.ansible_freeipa.ipabackup_get_backup_dir:
+  register: result_ipabackup_get_backup_dir
+
+- name: Set IPA backup dir
+  ansible.builtin.set_fact:
+    ipabackup_dir: "{{ result_ipabackup_get_backup_dir.backup_dir }}"

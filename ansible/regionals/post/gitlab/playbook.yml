@@ -1,0 +1,40 @@
+---
+- name: GitLab Playbook
+  hosts: gitlab
+  gather_facts: true
+  gather_subset: "!all,min"
+  become: true
+  vars_files:
+    - "../../roles/common.yml"
+  tasks:
+    - name: Include host setup role
+      ansible.builtin.include_role:
+        name: "../../roles/hostsetup"
+      vars:
+        hostsetup_hostname: "{{ hostname }}"
+        hostsetup_fqdn: "{{ hostname }}.{{ ipaserver_domain }}"
+        hostsetup_timezone: "America/New_York"
+
+    - name: Include blue_team access
+      ansible.builtin.include_tasks:
+        file: "../../../shared/blue_team/gitlab/user.yaml"
+
+    - name: Run GitLab post configuration
+      ansible.builtin.import_role:
+        name: "../../roles/blackteam.gitlab"
+        tasks_from: post
+      vars:
+        gitlab_domain: "{{ team }}.rust.energy"
+        gitlab_ssl: true
+        gitlab_letsencrypt_folder: "team_{{ team }}"
+        gitlab_smtp_enabled: true
+        gitlab_ldap_enabled: true
+        gitlab_ldap:
+          host: "10.{{ team }}.1.1"
+          bind_dn: "CN=svc_gitlab,OU=Users,OU=RUST,DC=ad,DC=rust,DC=energy"
+          bind_password: "PASSWORD"
+          user_filter: "(&(objectCategory=person)(objectClass=user))"
+          base: "DC=ad,DC=rust,DC=energy"
+          group_base: "OU=Groups,OU=RUST,DC=ad,DC=rust,DC=energy"
+          admin_group: "CN=IT,OU=Groups,OU=RUST,DC=ad,DC=rust,DC=energy"
+      tags: post

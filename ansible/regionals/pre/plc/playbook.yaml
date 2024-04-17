@@ -1,0 +1,220 @@
+---
+- name: Create PLC
+  hosts: all
+  become: true
+  tasks:
+    - name: Wait for everything to be ready
+      ansible.builtin.pause:
+        seconds: 60
+
+    - name: Set a hostname
+      ansible.builtin.hostname:
+        name: plc
+      ignore_errors: true
+
+    - name: Refresh all repos
+      community.general.zypper_repository:
+        repo: '*'
+        runrefresh: true
+      environment:
+        ZYPP_LOCK_TIMEOUT: '60'
+
+    - name: Update all packages
+      community.general.zypper:
+        name: '*'
+        state: latest
+
+    # https://en.opensuse.org/Docker
+    - name: Install packages
+      community.general.zypper:
+        name: '{{ item }}'
+        state: present
+      with_items:
+        - docker
+        - docker-compose
+        - docker-bash-completion
+        - docker-buildx
+        - python3-pip
+        - git
+
+    - name: Install python pip package
+      ansible.builtin.pip:
+        name: '{{ item }}'
+      with_items:
+        - docker
+        - docker-compose
+
+    - name: Start Docker service
+      ansible.builtin.systemd:
+        name: docker
+        state: started
+        enabled: true
+
+    - name: Add docker group to user
+      ansible.builtin.user:
+        name: ec2-user
+        groups: docker
+        append: true
+
+    - name: Clone OpenPLC Git Repo
+      become_user: ec2-user
+      become: true
+      ansible.builtin.git:
+        repo: 'https://github.com/thiagoralves/OpenPLC_v3.git'
+        dest: '/home/ec2-user/OpenPLC'
+        accept_hostkey: true
+        update: false
+      tags:
+        - openplc
+
+    - name: Copy custom openplc code into dir OpenPLC
+      ansible.builtin.copy:
+        src: '../../../../neccdc_ics_2024/openplc_scripts/openplc_persistent/persistent'
+        dest: '/home/ec2-user/OpenPLC/persistent'
+        owner: ec2-user
+        group: users
+        mode: "0664"
+      tags:
+        - openplc
+
+    - name: Copy custom openplc executables into dir OpenPLC
+      ansible.builtin.copy:
+        src: '../../../../neccdc_ics_2024/openplc_scripts/openplc_persistent/{{ item }}'
+        dest: '/home/ec2-user/OpenPLC/{{ item }}'
+        owner: ec2-user
+        group: users
+        mode: "0764"
+      with_items:
+        - active_program
+        - post_plc_prep.sh
+        - post_plc.sh
+      tags:
+        - openplc
+
+    - name: Build OpenPLC docker
+      ansible.builtin.docker_image:
+        name: openplc
+        tag: v3
+        source: build
+        build:
+          path: '/home/ec2-user/OpenPLC'
+      tags:
+        - openplc
+        - build
+
+    - name: Copy Docker Compose YAML file
+      ansible.builtin.copy:
+        src: templates/docker-compose.yaml
+        dest: '/home/ec2-user/docker-compose.yaml'
+        owner: ec2-user
+        group: users
+        mode: "0664"
+      tags:
+        - openplc
+
+    # Get reset on AMI creation
+    - name: Change ec2-user password
+      ansible.builtin.user:
+        name: ec2-user
+        password: "{{ 'PASSWORD' | password_hash('sha512') }}"
+      tags:
+        - telnet
+
+    - name: Change root password
+      ansible.builtin.user:
+        name: root
+        password: "{{ 'PASSWORD' | password_hash('sha512') }}"
+      tags:
+        - telnet
+
+    - name: Copy junk into ec2-user home dir
+      ansible.builtin.copy:
+        src: templates/home/
+        dest: '/home/ec2-user/'
+        owner: ec2-user
+        group: users
+        mode: "0664"
+      tags:
+        - home
+
+    - name: Install SSM agent
+      community.general.zypper:
+        name: amazon-ssm-agent
+        state: present
+      tags:
+        - ssm
+
+    - name: Starting SSM service
+      ansible.builtin.service:
+        name: amazon-ssm-agent
+        enabled: true
+        state: started
+      tags:
+        - ssm
+
+    - name: Run black team tasks
+      ansible.builtin.include_tasks:
+        file: "../../../shared/black_team/main.yaml"
+      vars:
+        root_groups: root,docker
+        black_team_password: PASSWORD
+        black_team_pub_path: '../../../documentation/black_team/black-team.pub'
+
+- name: Create Linux Users
+  hosts: all
+  become: true
+  tasks:
+    - name: Create blue team user
+      ansible.builtin.user:
+        name: "admin"
+        password: "{{ 'PASSWORD' | password_hash('sha512') }}"
+        append: true
+        groups: root,docker
+      tags:
+        - blue
+
+    - name: Set authorized key for admin
+      ansible.posix.authorized_key:
+        user: admin
+        state: present
+        key: "{{ lookup('file', '../../../shared/blue_team/plc/pki/plc-key.pub') }}"
+      tags:
+        - blue
+
+    - name: Allow admin sudoers
+      ansible.builtin.lineinfile:
+        dest: /etc/sudoers
+        state: present
+        regexp: "^admin"
+        line: "admin ALL=(ALL:ALL) NOPASSWD:ALL"
+        validate: "visudo -cf %s"
+      tags:
+        - blue
+
+    - name: Convert YAML to JSON
+      ansible.builtin.set_fact:
+        users_data: "{{ lookup('file', '../../../../documentation/NECCDL_2024_Employees.yaml') | from_yaml }}"
+      tags:
+        - users
+
+    - name: Create Linux user for groups from Department
+      ansible.builtin.user:
+        name: "{{ item.Username }}"
+        password: "{{ item.Password | password_hash('sha512') }}"
+      with_items: "{{ users_data }}"
+      when: item.Department in ['IoT Development', 'Hydro-Electric Engineering', 'Operational Technology']
+      ignore_errors: true
+      tags:
+        - users
+
+    - name: Create Linux user for groups from JobTitle
+      ansible.builtin.user:
+        name: "{{ item.Username }}"
+        password: "{{ item.Password | password_hash('sha512') }}"
+        append: true
+        groups: docker
+      with_items: "{{ users_data }}"
+      when: item.JobTitle in ['IoT Specialist']
+      ignore_errors: true
+      tags:
+        - users

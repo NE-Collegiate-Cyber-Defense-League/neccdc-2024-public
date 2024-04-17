@@ -1,0 +1,27 @@
+---
+- name: Create Identity Trust
+  hosts: identity
+  gather_facts: false
+  become: true
+  vars:
+    adserver_ip: "10.{{ inventory_hostname.split('.')[-3] }}.1.1"
+  vars_files:
+    - ../vars/vars_users.yml
+
+  tasks:
+    - name: Ensure presence of forwardzone with a single forwarder DNS server
+      freeipa.ansible_freeipa.ipadnsforwardzone:
+        ipaadmin_password: "{{ ipaadmin_password }}"
+        name: "{{ adserver_domain }}"
+        forwarders:
+          - ip_address: "{{ adserver_ip }}"
+        forwardpolicy: first
+        state: present
+
+    - name: Establish two-way trust with AD
+      freeipa.ansible_freeipa.ipatrust:
+        ipaadmin_password: "{{ ipaadmin_password }}"
+        realm: "{{ adserver_domain }}"
+        admin: "Administrator@{{ adserver_domain }}"
+        password: "{{ adserver_password }}"
+        state: present

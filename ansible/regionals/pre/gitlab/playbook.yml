@@ -1,0 +1,34 @@
+---
+- name: Packer GitLab
+  hosts: all
+  gather_facts: false # Leave this set to false
+  become: true
+  vars:
+    configured_port: 2222
+  tasks:
+    - name: Include gitlab-ssh tasks
+      ansible.builtin.include_tasks:
+        file: tasks/swap-ssh.yml
+
+    - name: Include blackteam role
+      ansible.builtin.include_role:
+        name: "../../roles/blackteam"
+
+    # Modify kernel parameters to allow unprivileged ports
+    # Required for GitLab User to run on port 80/443
+    - name: Allow unprivileged ports for git user in sysctl
+      ansible.builtin.sysctl:
+        name: net.ipv4.ip_unprivileged_port_start
+        value: 0
+        state: present
+
+    - name: Set timezone to EST
+      ansible.builtin.timezone:
+        name: America/New_York
+
+    - name: Include the role to install GitLab
+      ansible.builtin.include_role:
+        name: "../../roles/blackteam.gitlab"
+      vars:
+        gitlab_root_password: "PASSWORD"
+        gitlab_runners_token: "API_TOKEN"

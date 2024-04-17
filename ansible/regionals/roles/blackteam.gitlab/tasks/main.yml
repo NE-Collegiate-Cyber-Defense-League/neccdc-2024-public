@@ -1,0 +1,261 @@
+---
+################################
+# Pre-Install
+################################
+# Install the required apt packages / requirements.
+- name: Install GitLab dependencies.
+  ansible.builtin.apt:
+      name: "{{ _dependencies }}"
+      state: present
+      update_cache: true
+      force_apt_get: yes
+  tags: preinstall
+
+# Required for the community.general.gitlab_user module.
+- name: Install required python packages.
+  ansible.builtin.pip:
+    name: "{{ _python_packages }}"
+    state: present
+  tags: preinstall
+
+# Configures the swapfile for GitLab.
+- name: Setup swapfile
+  ansible.builtin.include_role:
+    name: geerlingguy.swap
+  vars:
+    swap_file_size_mb: "2048"
+    swap_swappiness: "10"
+
+# Determine if the config file already exists.
+- name: Check if GitLab configuration file already exists.
+  stat:
+    path: "{{ _files.config }}"
+  register: gitlab_cfg
+  tags: preinstall
+
+# Determine if the cli tool already exists. This will help drive logic later.
+- name: Check if GitLab is already installed.
+  stat:
+    path: "{{ _files.cli }}"
+  register: gitlab_cli
+  tags: preinstall
+
+# Define the name of the package to be installed.
+- name: Define the Gitlab package name.
+  set_fact:
+    gitlab_package_name: "{{ gitlab_edition }}={{ gitlab_version }}"
+  when: gitlab_version | default(false)
+  tags: preinstall
+
+#################################
+## GitLab App Installation
+#################################
+# Download the GitLab repo setup script.
+- name: Download GitLab repository installation script.
+  get_url:
+    url: "{{ _installation_script.url }}"
+    dest: "{{ _installation_script.tmp_file }}"
+    validate_certs: false 
+    mode: 0755
+  when: not gitlab_cli.stat.exists
+  tags: install
+
+# Execute the downloaded file to configure the GitLab repos.
+- name: Setup GitLab APT repository.
+  command: "{{ _installation_script.tmp_file }}"
+  when: not gitlab_cli.stat.exists
+  tags: install
+
+# Delete the downloaded repo config script
+- name: Delete repo script
+  ansible.builtin.file:
+    path: "{{ _installation_script.tmp_file }}"
+    state: absent
+
+# Install GitLab. This task can take a while.
+- name: Install GitLab
+  package:
+    name: "{{ gitlab_package_name | default(gitlab_edition) }}"
+    state: present
+  when: not gitlab_cli.stat.exists
+  tags: install
+
+# Set gitlab-sshd binary to use unprivileged ports
+- name: Set gitlab-sshd to use unprivileged ports
+  ansible.builtin.capabilities:
+    path: /opt/gitlab/embedded/service/gitlab-shell/bin/gitlab-sshd
+    capability: CAP_NET_BIND_SERVICE=+eip
+    state: present
+
+################################
+# GitLab Config
+################################
+# Generate the gitlab.rb config file & execute a reconfig.
+- name: Copy GitLab configuration file.
+  ansible.builtin.template:
+    src: gitlab.rb.j2
+    dest: "{{ _files.config }}"
+    owner: root
+    group: root
+    mode: 0600
+  notify: GitLabCtl Reconfigure
+  tags: config
+
+# By default, handlers run after all the tasks in a particular play have been completed.
+# https://docs.ansible.com/ansible/latest/user_guide/playbooks_handlers.html#controlling-when-handlers-run
+- name: Run the gitlab-ctl reconfigure now.
+  meta: flush_handlers
+
+################################
+# SSH Config
+################################
+- name: Create gitlab-sshd configuration folder.
+  file:
+    path: "{{ _paths.gitlab_sshd }}"
+    state: directory
+    owner: git
+    group: git
+    mode: 0755
+  when: gitlab_sshd.enabled
+  tags: ssh 
+
+- name: Gather location of private SSH hostkeys
+  ansible.builtin.find:
+    paths: "{{ _paths.ssh_hostkeys }}"
+    patterns: "ssh_host_*_key"
+  register: priv_ssh_hostkeys
+  when: gitlab_sshd.enabled
+  tags: ssh
+
+- name: Gather location of public SSH hostkeys
+  ansible.builtin.find:
+    paths: "{{ _paths.ssh_hostkeys }}"
+    patterns: "ssh_host_*_key.pub"
+  register: pub_ssh_hostkeys
+  when: gitlab_sshd.enabled
+  tags: ssh
+
+- name: Copy private SSH hostkeys to gitlab-sshd folder
+  ansible.builtin.copy:
+    src: "{{ item.path }}"
+    dest: "{{ _paths.gitlab_sshd }}"
+    remote_src: true
+    owner: git
+    group: git
+    mode: 0600
+  with_items: "{{ priv_ssh_hostkeys.files }}"
+  when: gitlab_sshd.enabled and "dsa" not in item.path
+  notify: GitLabCtl Reconfigure
+  tags: ssh
+
+- name: Copy public SSH hostkeys to gitlab-sshd folder
+  ansible.builtin.copy:
+    src: "{{ item.path }}"
+    dest: "{{ _paths.gitlab_sshd }}"
+    remote_src: true
+    owner: git
+    group: git
+    mode: 0644
+  with_items: "{{ pub_ssh_hostkeys.files }}"
+  when: gitlab_sshd.enabled and "dsa" not in item.path
+  notify: GitLabCtl Reconfigure
+  tags: ssh
+
+################################
+# Root Access Token
+################################
+- name: Set access token for API access
+  ansible.builtin.shell:
+    cmd: >
+      gitlab-rails runner "token = User.find_by_username('root').personal_access_tokens.create(scopes: [:api], name: 'root pac', expires_at: 365.days.from_now); token.set_token('{{ gitlab_pat_token }}'); token.save!"
+  tags: token
+
+- name: Set default email address
+  ansible.builtin.shell:
+    cmd: >
+      gitlab-rails runner "root = User.find_by_username('root'); root.email = '{{ gitlab_root_email }}'; root.skip_reconfirmation!; root.save!;"
+  tags: token
+
+- name: Create the black-team account
+  community.general.gitlab_user:
+    api_url: http://localhost/
+    validate_certs: false
+    # api_token: "{{ gitlab_pat_token }}"
+    api_username: root
+    api_password: "{{ gitlab_root_password }}" 
+    confirm: true
+    name: black-team
+    username: black-team
+    password: PASSWORD
+    email: "{{ gitlab_root_email }}"
+    isadmin: true
+    sshkey_name: black-team
+    sshkey_file: "{{ lookup('ansible.builtin.file', 'files/black-team.pub') }}"
+    state: present
+  register: gitlab_black_user
+  tags:
+    - api
+
+- name: Set access token for API access
+  ansible.builtin.shell:
+    cmd: >
+      gitlab-rails runner "token = User.find_by_username('black-team').personal_access_tokens.create(scopes: [:api], name: 'black-team pac', expires_at: 365.days.from_now); token.set_token('BLACK_TEAM_TOKEN!'); token.save!"
+  tags: api
+  when: gitlab_black_user.changed
+
+- name: Get emails from GitLab
+  uri:
+    url: "http://localhost/api/v4/users/1/emails"
+    method: GET
+    headers:
+      PRIVATE-TOKEN: "{{ gitlab_pat_token }}"
+    validate_certs: false
+  register: gitlab_api
+    
+- debug: var=gitlab_api
+
+- name: Get email matching admin@example.com
+  set_fact:
+    admin_email: "{{ gitlab_api.json | json_query('[?email==`admin@example.com`].id') | first }}"
+    
+- debug: var=admin_email
+
+- name: Delete email from root user
+  uri:
+    url: "http://localhost/api/v4/users/1/emails/{{ admin_email }}"
+    method: DELETE
+    headers:
+      PRIVATE-TOKEN: "{{ gitlab_pat_token }}"
+    validate_certs: false
+    status_code: [204] 
+  register: delete_email
+
+
+################################
+# SMTP Credentials
+################################
+- name: Copy SMTP secrets
+  ansible.builtin.copy:
+    src: smtp.yaml
+    dest: "{{ _files.smtp_secret }}"
+    owner: root
+  tags: smtp
+
+- name: Encrypt the secrets file
+  ansible.builtin.shell: "cat {{ _files.smtp_secret }} | sudo gitlab-rake gitlab:smtp:secret:write"
+  tags: smtp
+
+- name: Remove the secrets file
+  ansible.builtin.file:
+    path: "{{ _files.smtp_secret }}"
+    state: absent
+  tags: smtp
+
+- name: Retrieve the encrypted secrets file
+  ansible.builtin.shell: sudo gitlab-rake gitlab:smtp:secret:show
+  register: smtp_secret
+
+- name: debug
+  ansible.builtin.debug:
+    var: smtp_secret.stdout
+  tags: smtp

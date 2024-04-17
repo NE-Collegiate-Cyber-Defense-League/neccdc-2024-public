@@ -1,0 +1,37 @@
+# haproxy-ingress
+- name: Create ingress namespace
+  become: true
+  become_user: ubuntu
+  kubernetes.core.k8s:
+    name: ingress
+    api_version: v1
+    kind: Namespace
+    state: present
+  tags:
+    - services
+    - ingress
+
+# https://artifacthub.io/packages/helm/haproxy-ingress/haproxy-ingress
+- name: Deploy haproxy-ingress
+  become: true
+  become_user: ubuntu
+  kubernetes.core.helm:
+    name: haproxy-ingress
+    chart_ref: haproxy-ingress/haproxy-ingress
+    chart_version: '0.14.6'
+    release_namespace: ingress
+    values:
+      controller:
+        kind: DaemonSet
+        hostNetwork: true
+        ingressClassResource:
+          enabled: true
+        tcp:
+          5432: "database/postgresql-ha-postgresql:5432"
+        tolerations:
+          - key: "node-role.kubernetes.io/control-plane"
+            operator: "Exists"
+            effect: "NoSchedule"
+  tags:
+    - services
+    - ingress

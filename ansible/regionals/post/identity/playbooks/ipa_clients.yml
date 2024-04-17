@@ -1,0 +1,37 @@
+---
+- name: Install IPA client
+  hosts: nodes:gitlab:wazuh
+  become: true
+  vars_files:
+    - "../../../roles/common.yml"
+  tasks:
+    - name: "Ensure SSH PermitEmptyPasswords is disabled"
+      ansible.builtin.lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: "^#PermitEmptyPasswords|^PermitEmptyPasswords"
+        line: 'PermitEmptyPasswords no'
+
+    - name: Include host_setup role
+      ansible.builtin.include_role:
+        name: "../../../roles/hostsetup"
+      vars:
+        hostsetup_hostname: "{{ hostname }}"
+        hostsetup_fqdn: "{{ hostname }}.{{ ipaserver_domain }}"
+        hostsetup_timezone: "America/New_York"
+
+    - name: Include hostsetup_dns role
+      ansible.builtin.include_role:
+        name: "../../../roles/hostsetup_dns"
+      vars:
+        hostsetup_dns_servers: "{{ dns_servers }}"
+        hostsetup_dns_search: "{{ dns_search }}" 
+
+    - name: Install IPA client
+      ansible.builtin.include_role:
+        name: ../roles/ipaclient
+      vars:
+        ipaclient_domain: "{{ ipaserver_domain }}"
+        ipaclient_mkhomedir: true
+        ipaclient_no_ntp: true
+        ipasssd_enable_dns_updates: true
+        state: present

@@ -1,0 +1,59 @@
+---
+- name: Identity Management
+  hosts: all
+  become: true
+  
+  tasks:
+    - name: Include blackteam role
+      ansible.builtin.include_role:
+        name: "../../roles/blackteam"
+
+    - name: Cloud-Init - Enable root login
+      ansible.builtin.lineinfile:
+        path: /etc/cloud/cloud.cfg
+        regexp: '^disable_root:'
+        line: 'disable_root: false'
+        backrefs: true
+    
+    - name: Cloud-Init - Enable SSH Password Auth
+      ansible.builtin.lineinfile:
+        path: /etc/cloud/cloud.cfg
+        regexp: '^ssh_pwauth:'
+        line: 'ssh_pwauth: true'
+        backrefs: true
+    
+    - name: Configure crypto policies
+      ansible.builtin.include_role:
+        name: ../roles/crypto_policies
+      vars:
+        crypto_policy: "DEFAULT:AD-SUPPORT-LEGACY"
+        crypto_policies_reload: true
+        crypto_policies_reboot_ok: true
+    
+    - name: Upgrade all packages
+      ansible.builtin.dnf:
+        name: "*"
+        state: latest
+    
+    - name: Install packages
+      ansible.builtin.dnf:
+        name:
+          - ipa-server
+          - ipa-server-dns
+          - ipa-server-trust-ad
+          - ipa-healthcheck
+          - samba-client
+          - firewalld
+        state: present
+    
+    - name: Download and install amazon-ssm-agent rpm package
+      ansible.builtin.dnf:
+        name: "https://s3.amazonaws.com/ec2-downloads-windows/SSMAgent/latest/linux_amd64/amazon-ssm-agent.rpm"
+        disable_gpg_check: true
+    
+    - name: Enable Amazon SSM Agent service
+      ansible.builtin.service:
+        name: amazon-ssm-agent
+        enabled: true
+        state: started
+    

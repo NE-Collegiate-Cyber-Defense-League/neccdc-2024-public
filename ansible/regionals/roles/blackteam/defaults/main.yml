@@ -1,0 +1,13 @@
+privileged_groups:
+  - black-team
+  - root
+  - sudo
+  - wheel
+  - adm
+  - admin
+  - docker
+
+prefered_shells:
+  - /bin/bash
+  - /usr/local/bin/bash
+  - /bin/sh

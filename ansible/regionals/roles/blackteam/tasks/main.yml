@@ -1,0 +1,64 @@
+---
+- name: Fetch Ansible Facts
+  ansible.builtin.setup:
+    gather_subset:
+      - '!all'
+
+# Case sensitive search for vars files
+- name: Fetch OS Specific Variables
+  ansible.builtin.include_vars: "{{ lookup('first_found', params) }}"
+  vars:
+    params:
+      files:
+        - "{{ ansible_distribution }}_{{ ansible_distribution_release }}.yml"
+        - "{{ ansible_distribution }}.yml"
+        - "{{ ansible_os_family }}.yml"
+      paths:
+        - "{{ role_path }}/vars"
+
+#- name: Fetch OS available shells
+#  ansible.builtin.shell:
+#    cmd: "cat /etc/shells | grep -v '^#' | grep -v '^$'"
+#  register: available_shells
+#
+#- name: Print available shells
+#  ansible.builtin.debug:
+#    msg: "{{ prefered_shells | intersect(available_shells.stdout_lines) }}"
+
+- name: Create black-team user
+  ansible.builtin.user:
+    name: black-team
+    password: "{{ 'PASSWORD' | password_hash('sha512') }}"
+#    shell: "{{ prefered_shells | intersect(available_shells.stdout_lines) | first}}"
+    shell: "{{ default_shell }}"
+    state: present
+    createhome: true
+
+- name: Ensure group "black-team" exists
+  ansible.builtin.group:
+    name: black-team
+    state: present
+
+- name: Get all groups on the system
+  ansible.builtin.getent:
+    database: group
+
+- name: Make sure black-team user belongs to privileged groups
+  ansible.builtin.user:
+    name: black-team
+    groups: "{{ getent_group.keys() | intersect(privileged_groups) }}"
+    append: true
+
+- name: Allow black-team user passwordless sudo
+  ansible.builtin.lineinfile:
+    dest: "{{ sudoers_file }}"
+    state: present
+    regexp: "^%black-team"
+    line: "%black-team ALL=(ALL) NOPASSWD: ALL"
+    validate: "visudo -cf %s"
+
+- name: Set authorized key for blackteam user
+  ansible.posix.authorized_key:
+    user: black-team
+    state: present
+    key: "{{ lookup('file', '{{ role_path }}/files/black-team.pub') }}"

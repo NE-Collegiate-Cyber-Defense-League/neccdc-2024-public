@@ -1,0 +1,40 @@
+---
+- name: Domain Join for Windows Servers and Workstations
+  hosts: "{{ ansible_limit | default('domain_clients') }}"
+  gather_facts: false
+  vars:
+    adserver_ip: "10.{{ inventory_hostname.split('.')[-3] }}.1.1"
+  
+  tasks:
+    - name: Update DNS Server Configuration
+      ansible.windows.win_dns_client:
+        adapter_names: "*"
+        dns_servers:
+          - "{{ adserver_ip }}"
+
+    - name: Set Server Time Zone to Eastern Standard Time
+      community.windows.win_timezone:
+        timezone: Eastern Standard Time
+
+    - name: Update Hostname to Align with Inventory Naming
+      ansible.windows.win_hostname:
+        name: "{{ hostname }}"
+      register: result_hostname
+
+    - name: Initiate Reboot if Hostname Update Requires
+      ansible.windows.win_reboot:
+      when: result_hostname.reboot_required
+
+    - name: Join Object to Active Directory Domain
+      microsoft.ad.membership:
+       hostname: "{{ hostname }}"
+       dns_domain_name: "{{ adserver_domain }}"
+       domain_admin_user: "{{ ansible_user }}@{{ adserver_domain }}"
+       domain_admin_password: "{{ ansible_password }}"
+       domain_ou_path: "OU={{ ou_path }},OU=Computers,OU=RUST,DC=ad,DC=rust,DC=energy"
+       state: domain
+      register: result_domain    
+    
+    - name: Reboot Post Domain Join if Required
+      ansible.windows.win_reboot:
+      when: result_domain.reboot_required

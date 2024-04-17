@@ -1,0 +1,192 @@
+---
+- name: Configure Wireguard Node
+  become: true
+  hosts: all
+  vars:
+    wireguard_public_host: "169.254.0.1" # Public IP of wireguard
+    wireguard_subnet_black_team: "172.16.127.x"
+    wireguard_subnet_blue_team: "172.16"
+    blue_team_subnet: "10"
+    blue_team_block: "16"
+    wireguard_client_dns: "1.1.1.1"
+    wireguard_blue_team_password: BlueTeamPassword
+    number_of_teams: 10
+    wireguard_black_team_password: BlackTeamPassword
+    black_team_clients:
+      - black0
+      - black1
+      - black2
+      - black3
+      - red0
+      - red1
+      - red2
+      - red3
+      - red4
+      - red5
+      - red6
+      - red7
+      - red8
+      - red9
+    output_dir: '../../../documentation/wireguard.zip'
+  tasks:
+    - name: Install packages
+      ansible.builtin.apt:
+        name: "{{ packagesdep }}"
+        force_apt_get: true
+        state: present
+        update_cache: true
+      vars:
+        packagesdep:
+          - apt-transport-https
+          - ca-certificates
+          - software-properties-common
+          - gnupg2
+          - curl
+      tags:
+        - base
+
+    - name: Add Apt signing key from official docker repo
+      ansible.builtin.apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+      tags:
+        - base
+
+    - name: Add docker official repository
+      ansible.builtin.apt_repository:
+        repo: deb [arch=amd64] https://download.docker.com/linux/ubuntu jammy stable
+        state: present
+      tags:
+        - base
+
+    - name: Index new repo into the cache
+      ansible.builtin.apt:
+        update_cache: true
+        force_apt_get: true
+      tags:
+        - base
+
+    - name: Install docker
+      ansible.builtin.apt:
+        name: "docker-ce"
+        state: present
+      tags:
+        - base
+
+    - name: Service docker
+      ansible.builtin.service:
+        name: docker
+        state: started
+        enabled: true
+      tags:
+        - base
+
+    - name: Add ubuntu to the docker group
+      ansible.builtin.user:
+        name: ubuntu
+        groups: docker
+        append: true
+      tags:
+        - base
+
+    - name: Create wireguard config directory
+      ansible.builtin.file:
+        path: /opt/wireguard
+        state: directory
+        mode: '0755'
+      tags:
+        - base
+
+    - name: Setup black team wireguard
+      ansible.builtin.include_tasks:
+        file: "tasks/wireguard_instance.yaml"
+      vars:
+        wg_name: "black-team"
+        item: "BT"
+        udp_port: 51899
+        tcp_port: 51999
+        wireguard_password: "{{ wireguard_black_team_password }}"
+        wireguard_client_subnet: "{{ wireguard_subnet_black_team }}"
+        wireguard_allowed_ips: "172.16.0.0/12,10.0.0.0/8"
+        clients: "{{ black_team_clients }}"
+        iptables: false
+      tags:
+        - client
+        - wireguard
+        - base
+
+    # iptables -I DOCKER-USER -j RETURN
+    - name: Remove default allow out
+      ansible.builtin.iptables:
+        chain: DOCKER-USER
+        jump: RETURN
+        state: absent
+      tags:
+        - iptables
+
+    - name: Setup blue team wireguard
+      with_sequence: start=0 end="{{ number_of_teams | int }}"
+      ansible.builtin.include_tasks:
+        file: "tasks/wireguard_instance.yaml"
+      vars:
+        wg_name: "blue-{{ item }}-team"
+        udp_port: "518{{ '%02d' | format(item | int) }}"
+        tcp_port: "519{{ '%02d' | format(item | int) }}"
+        wireguard_password: "{{ wireguard_blue_team_password }}"
+        wireguard_client_subnet: "{{ wireguard_subnet_blue_team }}.{{ item }}.x"
+        wireguard_allowed_ips: "172.16.0.0/12,10.0.0.0/8" # Tried using "0.0.0.0/0" for regionals but saw some issues in school network
+        iptables: true
+        clients:
+          - one
+          - two
+          - three
+          - four
+          - five
+          - six
+          - seven
+          - eight
+          - nine
+          - ten
+      tags:
+        - client
+        - wireguard
+        - base
+        - iptables
+
+      # iptables -I DOCKER-USER 1 -s 192.168.0.0/16 -d 10.0.0.0/8 -j REJECT
+    - name: Default reject team networks
+      ansible.builtin.iptables:
+        chain: DOCKER-USER
+        source: 192.168.0.0/16
+        destination: 10.0.0.0/8
+        jump: REJECT
+      tags:
+        - iptables
+
+    # iptables -I DOCKER-USER -j RETURN
+    - name: Default pass traffic
+      ansible.builtin.iptables:
+        chain: DOCKER-USER
+        jump: RETURN
+        state: present
+      tags:
+        - iptables
+
+    - name: Compress wireguard directory
+      community.general.archive:
+        path: /opt/wireguard
+        dest: /opt/wireguard.zip
+        format: zip
+        mode: '0600'
+        owner: 'root'
+        group: 'root'
+      tags:
+        - copy
+
+    - name: Copy wireguard files
+      ansible.builtin.fetch:
+        src: /opt/wireguard.zip
+        dest: "{{ output_dir }}"
+        flat: true
+      tags:
+        - copy

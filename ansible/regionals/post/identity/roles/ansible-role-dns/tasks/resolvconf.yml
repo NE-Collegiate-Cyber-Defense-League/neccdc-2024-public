@@ -1,0 +1,13 @@
+# vim: ai et ts=2 st=2 sw=2 :
+---
+- name: Remove resolvconfd package
+  ansible.builtin.package:
+    name: resolvconf
+    state: absent
+  when: ansible_distribution|lower != "fedora"
+
+- name: Distribute resolv.conf template
+  ansible.builtin.template:
+    src: resolv.conf
+    dest: /etc/resolv.conf
+    mode: '0644'

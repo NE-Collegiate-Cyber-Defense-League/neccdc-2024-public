@@ -1,0 +1,16 @@
+--- 
+- name: Run playbooks/ipa_server.yml
+  ansible.builtin.import_playbook: playbooks/ipa_server.yml
+  tags: [ipa_server]
+
+- name: Run playbooks/ipa_trust.yml
+  ansible.builtin.import_playbook: playbooks/ipa_trust.yml
+  tags: [never, ipa_trust]
+
+- name: Run playbooks/ipa_populate.yml
+  ansible.builtin.import_playbook: playbooks/ipa_populate.yml
+  tags: [never, ipa_populate]
+
+- name: Run playbooks/ipa_clients.yml
+  ansible.builtin.import_playbook: playbooks/ipa_clients.yml
+  tags: [never, ipa_clients]

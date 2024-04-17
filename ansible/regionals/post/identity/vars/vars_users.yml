@@ -1,0 +1,59 @@
+---
+ipa_trust_groups_create:
+  - name: ad_admins_external
+    external: True
+    externalmember:
+      - "AD\\Domain Admins"
+  - name: ad_server_admins_external
+    external: True
+    externalmember:
+      - "AD\\Server Admins"
+  - name: ad_desktop_admins_external
+    external: True
+    externalmember:
+      - "AD\\Desktop Admins"
+  - name: ad_operations_external
+    external: True
+    externalmember:
+      - "AD\\Operations"
+  - name: ad_operational_tech_external
+    external: True
+    externalmember:
+      - "AD\\Operational Technology"
+
+ipa_groups_create:
+  - name: ad_admins
+    posix: True
+    group:
+      - ad_admins_external
+  - name: ad_server_admins
+    posix: True
+    group:
+      - ad_server_admins_external
+  - name: ad_desktop_admins
+    posix: True
+    group:
+      - ad_desktop_admins_external
+  - name: ad_operations
+    posix: True
+    group:
+      - ad_operations_external
+  - name: ad_operational_tech
+    posix: True
+    group:
+      - ad_operational_tech_external
+
+ipa_group_members_add:
+  - name: admins
+    group:
+      - ad_admins
+      - ad_server_admins
+  - name: trust admins
+    group:
+      - ad_admins
+      - ad_server_admins
+      - ad_desktop_admins
+
+good_fails:
+  - "This entry is already a member"
+  - "This group already allows external members"

@@ -1,0 +1,40 @@
+windows_servers:
+  children:
+    win_ca:
+    win_web:
+  vars:
+    ou_path: Servers
+
+windows_workstations:
+  children:
+    win_work_01:
+    win_work_02:
+  vars:
+    ou_path: Workstations
+
+domain_clients:
+  children:
+    windows_servers:
+    windows_workstations:
+
+windows:
+  children:
+    win_dc:
+    domain_clients:
+  vars:
+    # Default for building
+    ansible_user: Administrator
+    ansible_password: "{{ adserver_password }}"
+
+    #ansible_connection: ssh
+    #ansible_shell_type: powershell
+    
+    ansible_connection: winrm
+    ansible_winrm_transport: ntlm
+    
+    #ansible_winrm_connection_timeout: 150
+    #ansible_winrm_read_timeout_sec: 150
+    #ansible_winrm_operation_timeout_sec: 120
+    ansible_winrm_server_cert_validation: ignore
+    ansible_ssh_common_args: '-o UserKnownHostsFile=/dev/null'
+    ntp_servers: "0.us.pool.ntp.org,1.us.pool.ntp.org"

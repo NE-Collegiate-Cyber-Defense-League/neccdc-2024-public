@@ -1,0 +1,35 @@
+# vim: ai et ts=2 st=2 sw=2 :
+---
+galaxy_info:
+  standalone: true
+  author: Arnulf Heimsbakk <aheimsbakk@met.no>
+  description: Configure resolv.conf on all Linux
+  company: MET Norway
+  role_name: dns
+  namespace: met
+
+  license: GPLv2
+
+  min_ansible_version: "2.12"
+
+  platforms:
+    - name: "Ubuntu"
+      versions:
+        - "jammy"
+        - "focal"
+        - "bionic"
+        - "xenial"
+    - name: "EL"
+      versions:
+        - "7"
+        - "8"
+        - "9"
+
+  galaxy_tags:
+    - dns
+    - resolv
+
+collections:
+  - "community.general"
+
+dependencies: []

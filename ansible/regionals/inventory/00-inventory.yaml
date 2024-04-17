@@ -1,0 +1,84 @@
+ctrl_plane:
+  hosts:
+    10.[0:10].192.211
+  vars:
+    hostname: ctrl-plane
+
+node_1:
+  hosts:
+    10.[0:10].192.222
+  vars:
+    hostname: node-1
+
+node_2:
+  hosts:
+    10.[0:10].192.233
+  vars:
+    hostname: node-2
+
+node_3:
+  hosts:
+    10.[0:10].192.244
+  vars:
+    hostname: node-3
+
+identity:
+  hosts:
+    10.[0:10].128.132
+  vars:
+    hostname: idm
+
+vault:
+  hosts:
+    10.[0:10].128.182
+  vars:
+    hostname: vault
+
+gitlab:
+  hosts:
+    10.[0:10].128.192
+  vars:
+    ansible_port: 2222 # GitLab stole 22
+    hostname: gitlab
+
+plc:
+  hosts:
+    10.[0:10].169.169
+  vars:
+    hostname: plc
+
+wazuh:
+  hosts:
+    10.[0:10].128.254
+  vars:
+    hostname: siem
+
+win_dc:
+  hosts:
+    10.[0:10].1.1
+  vars:
+    hostname: win-dc
+
+win_ca:
+  hosts:
+    10.[0:10].25.254
+  vars:
+    hostname: win-ca
+
+win_web:
+  hosts:
+    10.[0:10].25.200
+  vars:
+    hostname: win-web
+
+win_work_01:
+  hosts:
+    10.[0:10].13.37
+  vars:
+    hostname: win-work-01
+
+win_work_02:
+  hosts:
+    10.[0:10].22.222
+  vars:
+    hostname: win-work-02

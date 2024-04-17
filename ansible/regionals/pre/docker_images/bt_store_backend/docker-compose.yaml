@@ -1,0 +1,9 @@
+version: '3'
+services:
+  backend:
+    image: shop-backend:latest
+    build:
+      context: ./
+    ports:
+      - "3000:3000"
+    restart: unless-stopped

@@ -1,0 +1,255 @@
+---
+# https://helm.sh/docs/intro/install/#from-apt-debianubuntu
+- name: Helm repository
+  block:
+    - name: Download key
+      ansible.builtin.get_url:
+        url: https://baltocdn.com/helm/signing.asc
+        dest: /usr/share/keyrings/helm.asc
+
+    - name: Add APT repository
+      ansible.builtin.apt_repository:
+        repo: "deb [arch=amd64 signed-by=/usr/share/keyrings/helm.asc] https://baltocdn.com/helm/stable/debian/ all main"
+        state: present
+
+- name: Update apt packages
+  ansible.builtin.apt:
+    update_cache: true
+
+- name: Install postgresql-client
+  ansible.builtin.apt:
+    name: postgresql-client
+    state: present
+
+- name: Install helm
+  ansible.builtin.apt:
+    name: helm
+    state: present
+
+- name: Install Helm diff plugin
+  become: true
+  become_user: ubuntu
+  kubernetes.core.helm_plugin:
+    plugin_path: https://github.com/databus23/helm-diff
+    state: present
+
+- name: Install helm repositories
+  block:
+    - name: Add haproxy-ingress repository
+      become: true
+      become_user: ubuntu
+      kubernetes.core.helm_repository:
+        name: haproxy-ingress
+        repo_url: https://haproxy-ingress.github.io/charts
+
+    - name: Add bitnami repository
+      become: true
+      become_user: ubuntu
+      kubernetes.core.helm_repository:
+        name: bitnami
+        repo_url: https://charts.bitnami.com/bitnami
+
+    - name: Add argocd repository
+      become: true
+      become_user: ubuntu
+      kubernetes.core.helm_repository:
+        name: argo
+        repo_url: https://argoproj.github.io/argo-helm
+
+    - name: Add falco repository
+      become: true
+      become_user: ubuntu
+      kubernetes.core.helm_repository:
+        name: falcosecurity
+        repo_url: https://falcosecurity.github.io/charts
+
+- name: Install bash-completion
+  ansible.builtin.apt:
+    name: bash-completion
+    state: present
+
+- name: Kubectl completion
+  block:
+    - name: Install kubectl bash completion
+      ansible.builtin.command: kubectl completion bash
+      register: kubectl_completion
+      changed_when: false
+
+    - name: Create kubectl bash completion file
+      ansible.builtin.copy:
+        content: "{{ kubectl_completion.stdout_lines | join('\n') }}"
+        dest: /etc/bash_completion.d/kubectl
+        owner: root
+        group: root
+        mode: '0644'
+
+- name: Kubeadm completion
+  block:
+    - name: Install kubeadm bash completion
+      ansible.builtin.command: kubeadm completion bash
+      register: kubeadm_completion
+      changed_when: false
+
+    - name: Create kubeadm bash completion file
+      ansible.builtin.copy:
+        content: "{{ kubeadm_completion.stdout_lines | join('\n') }}"
+        dest: /etc/bash_completion.d/kubeadm
+        owner: root
+        group: root
+        mode: '0644'
+
+- name: Helm completion
+  block:
+    - name: Install helm bash completion
+      ansible.builtin.command: helm completion bash
+      register: helm_completion
+      changed_when: false
+
+    - name: Create helm bash completion file
+      ansible.builtin.copy:
+        content: "{{ helm_completion.stdout_lines | join('\n') }}"
+        dest: /etc/bash_completion.d/helm
+        owner: root
+        group: root
+        mode: '0644'
+
+- name: Add alias to .bashrc
+  become: true
+  become_user: ubuntu
+  ansible.builtin.lineinfile:
+    path: ~/.bashrc
+    line: '{{ item }}'
+  with_items:
+    - 'alias k=kubectl'
+    - 'alias c=clear'
+    - 'export AWS_SDK_LOAD_CONFIG=1'
+    - 'complete -o default -F __start_kubectl k'
+
+# ArgoCD
+- name: Download ArgoCD cli binary
+  ansible.builtin.get_url:
+    url: "https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64"
+    dest: "/tmp/argocd-linux-amd64"
+    mode: '0755'
+  tags:
+    - services
+    - argocd
+
+- name: Install ArgoCD cli binary
+  ansible.builtin.copy:
+    src: "/tmp/argocd-linux-amd64"
+    dest: "/usr/local/bin/argocd"
+    mode: '0555'
+    remote_src: true
+  tags:
+    - services
+    - argocd
+
+- name: Remove ArgoCD cli binary
+  ansible.builtin.file:
+    path: "/tmp/argocd-linux-amd64"
+    state: absent
+  tags:
+    - services
+    - argocd
+
+# Calico
+# https://docs.tigera.io/calico/latest/operations/calicoctl/install#install-calicoctl-as-a-binary-on-a-single-host
+- name: Download Calico binary
+  ansible.builtin.get_url:
+    url: "https://github.com/projectcalico/calico/releases/download/v3.27.0/calicoctl-linux-amd64"
+    dest: "/tmp/calicoctl-linux-amd64"
+    mode: '0755'
+  tags:
+    - calico
+
+- name: Install Calico binary
+  ansible.builtin.copy:
+    src: "/tmp/calicoctl-linux-amd64"
+    dest: "/usr/local/bin/calicoctl"
+    mode: '0555'
+    remote_src: true
+  tags:
+    - calico
+
+- name: Remove downloaded temp Calico binary
+  ansible.builtin.file:
+    path: "/tmp/calicoctl-linux-amd64"
+    state: absent
+  tags:
+    - calico
+
+# NerdCTL
+- name: Download the nerdctl archive
+  ansible.builtin.get_url:
+    url: "https://github.com/containerd/nerdctl/releases/download/v1.6.2/nerdctl-1.6.2-linux-amd64.tar.gz"
+    dest: "/tmp/nerdctl.tar.gz"
+    mode: "0600"
+
+- name: Create a temporary directory
+  ansible.builtin.file:
+    path: "/tmp/nerdctl_extracted"
+    state: directory
+    mode: "0755"
+
+- name: Extract Archive
+  ansible.builtin.unarchive:
+    src: "/tmp/nerdctl.tar.gz"
+    dest: "/tmp/nerdctl_extracted"
+    remote_src: true
+
+- name: Copy File to Binary Location
+  ansible.builtin.copy:
+    src: "/tmp/nerdctl_extracted/nerdctl"
+    dest: "/usr/bin/nerdctl"
+    remote_src: true
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Remove the nerdctl archive
+  ansible.builtin.file:
+    path: "/tmp/nerdctl.tar.gz"
+    state: absent
+
+- name: Remove the nerdctl unarchived files
+  ansible.builtin.file:
+    path: "/tmp/nerdctl_extracted"
+    state: absent
+
+- name: Nerdctl completion
+  block:
+    - name: Install nerdctl bash completion
+      ansible.builtin.command: nerdctl completion bash
+      register: nerdctl_completion
+      changed_when: false
+
+    - name: Create nerdctl bash completion file
+      ansible.builtin.copy:
+        content: "{{ nerdctl_completion.stdout_lines | join('\n') }}"
+        dest: /etc/bash_completion.d/nerdctl
+        owner: root
+        group: root
+        mode: '0644'
+
+## crictl
+- name: Download crictl binary
+  ansible.builtin.get_url:
+    url: "https://github.com/kubernetes-sigs/cri-tools/releases/download/v1.26.0/crictl-v1.26.0-linux-amd64.tar.gz"
+    dest: "/tmp/crictl-v1.26.0-linux-amd64.tar.gz"
+    mode: '0755'
+  tags:
+    - crictl
+
+- name: Extract crictl Archive
+  ansible.builtin.unarchive:
+    src: "/tmp/crictl-v1.26.0-linux-amd64.tar.gz"
+    dest: "/usr/local/bin/"
+    remote_src: true
+
+- name: Remove downloaded temp crictl binary
+  ansible.builtin.file:
+    path: "/tmp/crictl-v1.26.0-linux-amd64.tar.gz"
+    state: absent
+  tags:
+    - crictl

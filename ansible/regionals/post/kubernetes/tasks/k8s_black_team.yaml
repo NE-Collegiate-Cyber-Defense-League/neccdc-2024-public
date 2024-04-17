@@ -1,0 +1,77 @@
+---
+- name: Create kube directory for black team user
+  ansible.builtin.file:
+    path: /home/black-team/.kube
+    state: directory
+    owner: black-team
+    group: black-team
+    mode: '0750'
+  tags:
+    - black-team
+
+- name: Create black team user
+  ansible.builtin.shell: kubeadm kubeconfig user --client-name=black-team > /home/black-team/.kube/config
+  tags:
+    - black-team
+
+- name: Change file permissions on kubeconfig
+  ansible.builtin.file:
+    path: /home/black-team/.kube/config
+    owner: black-team
+    group: black-team
+    mode: '0600'
+  tags:
+    - black-team
+
+- name: Create cluster role for black team
+  become: true
+  become_user: ubuntu
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: rbac.authorization.k8s.io/v1
+      kind: ClusterRole
+      metadata:
+        name: black-team
+        labels:
+          team: black-team
+        annotations:
+          note: "black team not touch"
+      rules:
+        - apiGroups:
+            - '*'
+          resources:
+            - '*'
+          verbs:
+            - '*'
+        - nonResourceURLs:
+            - '*'
+          verbs:
+            - '*'
+  tags:
+    - black-team
+
+- name: Create cluster role binding for black team
+  become: true
+  become_user: ubuntu
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: rbac.authorization.k8s.io/v1
+      kind: ClusterRoleBinding
+      metadata:
+        name: black-team
+        labels:
+          team: black-team
+        annotations:
+          note: "black team not touch"
+      roleRef:
+        apiGroup: rbac.authorization.k8s.io
+        kind: ClusterRole
+        name: black-team
+      subjects:
+        - kind: User
+          name: black-team
+          apiGroup: rbac.authorization.k8s.io
+  tags:
+    - black-team

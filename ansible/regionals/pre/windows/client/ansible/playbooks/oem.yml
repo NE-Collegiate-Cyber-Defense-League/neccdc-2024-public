@@ -1,0 +1,22 @@
+---
+- name: Set OEM layout registry key
+  ansible.windows.win_regedit:
+    path: HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer
+    name: LayoutXMLPath
+    data: C:\Windows\OEM\TaskbarLayoutModification.xml
+    type: string
+    state: present
+
+- name: Create OEM directory
+  ansible.windows.win_file:
+    path: C:\Windows\OEM\
+    state: directory
+
+- name: Copy TaskbarLayoutModification.xml
+  ansible.windows.win_copy:
+    src: ../files/TaskbarLayoutModification.xml
+    dest: C:\Windows\OEM\TaskbarLayoutModification.xml
+
+- name: Add shortcuts to public desktop
+  ansible.windows.win_powershell:
+    script: "{{ lookup('ansible.builtin.file', '../files/desktop.ps1') }}"

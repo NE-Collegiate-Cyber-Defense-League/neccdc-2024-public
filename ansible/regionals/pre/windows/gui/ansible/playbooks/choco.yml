@@ -1,0 +1,23 @@
+---
+- name: Install microsoft-edge-insider
+  chocolatey.chocolatey.win_chocolatey:
+    name: microsoft-edge-insider
+    state: present
+
+- name: Install Feature RSAT Tools
+  ansible.windows.win_feature:
+    name:
+      - RSAT-AD-Tools
+      - RSAT-DNS-Server
+      - RSAT-ADCS
+      - GPMC
+    state: present
+    include_sub_features: true
+    include_management_tools: true
+
+- name: Install Feature PSWA
+  ansible.windows.win_feature:
+    name: WindowsPowerShellWebAccess
+    state: present
+    include_management_tools: true
+    include_sub_features: true

@@ -1,0 +1,27 @@
+---
+argument_specs:
+  # roles/hostname_tz/tasks/main.yml entry point
+  main:
+    short_description: Main entry point for the hostname_tz role
+    description:
+      - This is the main entrypoint for the C(hostname_tz) role.
+      - This role will configure the timezone and hostname of the target host.
+      - It will also updates /etc/hostname and /etc/hosts files.
+    author:
+      - BlackTeam
+    options:
+      hostname_tz_hostname:
+        type: "str"
+        required: true
+        description: "The hostname to set"
+
+      hostname_tz_fqdn:
+        type: "str"
+        required: true
+        description: "The FQDN including the hostname"
+
+      hostname_tz_timezone:
+        type: "str"
+        required: false
+        default: America/New_York
+        description: "The timezone to set"

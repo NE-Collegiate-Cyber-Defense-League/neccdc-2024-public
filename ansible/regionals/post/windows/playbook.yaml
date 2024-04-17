@@ -1,0 +1,20 @@
+---
+- name: Run playbooks/01_domain_create.yaml
+  ansible.builtin.import_playbook: playbooks/01_domain_create.yaml
+  tags: [domain_create]
+
+- name: Run playbooks/02_domain_populate.yaml
+  ansible.builtin.import_playbook: playbooks/02_domain_populate.yaml
+  tags: [domain_populate]
+
+- name: Run playbooks/03_domain_join.yaml
+  ansible.builtin.import_playbook: playbooks/03_domain_join.yaml
+  tags: [domain_join]
+
+- name: Run playbooks/setup_ca.yaml
+  ansible.builtin.import_playbook: playbooks/setup_ca.yaml
+  tags: [setup_ca]
+
+- name: Run playbooks/setup_iis.yaml
+  ansible.builtin.import_playbook: playbooks/setup_iis.yaml
+  tags: [setup_iis]

@@ -1,0 +1,44 @@
+---
+- name: Fetch Ansible Facts
+  ansible.builtin.setup:
+    gather_subset:
+      - '!all'
+
+- name: Set new hostname
+  ansible.builtin.hostname:
+    name: "{{ hostsetup_hostname }}"
+
+- name: Update /etc/hostname
+  ansible.builtin.template:
+    src: etc_hostname.j2
+    dest: /etc/hostname
+    owner: root
+    mode: "0644"
+
+#- name: Update /etc/resolv.conf
+#  ansible.builtin.template:
+#    src: resolv.conf.j2
+#    dest: /etc/resolv.conf
+#    owner: root
+#    mode: "0644"
+#  when: ansible_distribution != 'FreeBSD' and skip_resolv_conf is not defined
+
+- name: Update OS Specific /etc/hosts
+  ansible.builtin.template:
+    src: "{{ lookup('first_found', params) }}"
+    dest: /etc/hosts
+    owner: root
+    mode: "0644"
+  vars:
+    params:
+      files:
+        - "{{ ansible_distribution }}_etc_hosts.j2"
+        - "{{ ansible_os_family }}_etc_hosts.j2"
+        - "etc_hosts.j2"
+      paths:
+        - "{{ role_path }}/templates"
+  when: ansible_distribution != 'FreeBSD'
+
+- name: Set Timezone
+  ansible.builtin.timezone:
+    name: "{{ hostsetup_timezone }}"

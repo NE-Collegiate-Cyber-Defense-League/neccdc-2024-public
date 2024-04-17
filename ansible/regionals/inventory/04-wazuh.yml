@@ -1,0 +1,11 @@
+wazuh_windows:
+  children:
+    win_web:
+    win_work_01:
+    win_work_02:
+
+wazuh_linux:
+  children:
+    gitlab:
+    node_1:
+    node_2:

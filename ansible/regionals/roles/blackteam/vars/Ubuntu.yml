@@ -1,0 +1,9 @@
+---
+sudoers_file: /etc/sudoers
+
+default_shell: /bin/bash
+
+prefered_shells:
+  - /usr/bin/bash
+  - /bin/bash
+  - /bin/sh

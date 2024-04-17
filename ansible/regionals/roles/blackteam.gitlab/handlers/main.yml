@@ -1,0 +1,7 @@
+---
+# handlers file for gitlab
+- name: GitLabCtl Reconfigure
+  ansible.builtin.command: /opt/gitlab/bin/gitlab-ctl reconfigure
+  register: gitlabctl_output
+  failed_when: gitlab_restart_handler_failed_when | bool
+  become: true

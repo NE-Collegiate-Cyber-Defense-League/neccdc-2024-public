@@ -1,0 +1,16 @@
+ipa_hostgroups_create:
+  - name: corp
+    description: Corp Subnet
+  - name: kube
+    description: Kubernetes Cluster
+  - name: devops
+    description: Access to semaphore
+  - name: soc
+    description: Access to wazuh
+
+ipa_hbac_rules_create:
+  - name: allow_corp
+    description: Allow access to corp
+    groups:
+      - ad_server_admins
+      - ad_desktop_admins
