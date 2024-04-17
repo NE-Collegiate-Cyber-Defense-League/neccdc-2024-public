@@ -1,0 +1,66 @@
+// For format details, see https://aka.ms/devcontainer.json. For config options, see the
+// README at: https://github.com/devcontainers/templates/tree/main/src/ubuntu
+{
+	"name": "Ubuntu",
+	// Or use a Dockerfile or Docker Compose file. More info: https://containers.dev/guide/dockerfile
+	//"image": "mcr.microsoft.com/devcontainers/base:jammy"
+	"build": {
+		// Path is relative to the devcontainer.json file.
+		"dockerfile": "Dockerfile"
+	},
+
+	"mounts": [
+		"source=${localEnv:HOME}${localEnv:USERPROFILE}/.aws,target=/root/.aws,type=bind,consistency=cached"
+	],
+
+	// Features to add to the dev container. More info: https://containers.dev/features.
+	// "features": {},
+	
+	// Use 'forwardPorts' to make a list of ports inside the container available locally.
+	// "forwardPorts": [],
+	
+	// Use 'postCreateCommand' to run commands after the container is created.
+	// "postCreateCommand": "uname -a",
+
+	// Configure tool-specific properties.
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"chouzz.vscode-better-align",
+				"donjayamanne.python-environment-manager",
+				"donjayamanne.python-extension-pack",
+				"eamodio.gitlens",
+				"GitHub.copilot",
+				"GitHub.copilot-chat",
+				"GitHub.vscode-pull-request-github",
+				"Gruntfuggly.todo-tree",
+				"hashicorp.hcl",
+				"hashicorp.terraform",
+				"ironmansoftware.powershellprotools",
+				"janisdd.vscode-edit-csv",
+				"KevinRose.vsc-python-indent",
+				"mechatroner.rainbow-csv",
+				"ms-azuretools.vscode-docker",
+				"ms-python.black-formatter",
+				"ms-python.python",
+				"ms-python.vscode-pylance",
+				"ms-vscode.hexeditor",
+				"ms-vscode.powershell",
+				"mutantdino.resourcemonitor",
+				"nguyenngoclong.terminal-keeper",
+				"njpwerner.autodocstring",
+				"qcz.text-power-tools",
+				"redhat.ansible",
+				"redhat.vscode-xml",
+				"redhat.vscode-yaml",
+				"tamasfe.even-better-toml",
+				"VisualStudioExptTeam.intellicode-api-usage-examples",
+				"VisualStudioExptTeam.vscodeintellicode",
+				"wholroyd.jinja",
+				"spmeesseman.vscode-taskexplorer"
+			]
+		}
+	},
+	// Uncomment to connect as root instead. More info: https://aka.ms/dev-containers-non-root.
+	"remoteUser": "root"
+}

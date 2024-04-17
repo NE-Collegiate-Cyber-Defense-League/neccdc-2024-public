@@ -1,0 +1,20 @@
+**/*.tfstate*
+**/terraform.tfvars*
+**/.terraform/*
+.terraform
+.terraform.lock.hcl
+
+.DS_Store
+
+aws.csv
+
+**/.ansible/collections
+
+# Local History for Visual Studio Code
+.history/
+
+documentation/wireguard/
+ansible/qualifiers/inventory/local.yaml
+ansible/regionals/inventory/local.yaml
+
+ansible/regionals/pre/docker_images/bt_store_backend/node_modules/*
