@@ -1,0 +1,24 @@
+{
+    "name": "RDP_WIN_01",
+    "type": "http",
+    "score_weight": 1,
+    "definition": {
+        "requests": [
+            {
+                "host": "score.rust.energy",
+                "path": "/rdp/{{.Host}}?username={{.Username}}&password={{.Password}}",
+                "https": true,
+                "method": "GET",
+                "matchcode": true,
+                "code": 200
+            }
+        ]
+    },
+    "attributes": {
+        "admin": {
+            "Host": "10.0.{{.TeamNumber}}.100",
+            "Username": "black-team",
+            "Password": "14d3V414!"
+        }
+    }
+}

@@ -1,0 +1,13 @@
+{
+    "name": "ICMP_WIN-02",
+    "type": "icmp",
+    "score_weight": 1,
+    "definition": {
+      "host": "{{.Host}}"
+    },
+    "attributes": {
+      "admin": {
+        "Host": "10.0.{{.TeamNumber}}.110"
+      }
+    }
+  }

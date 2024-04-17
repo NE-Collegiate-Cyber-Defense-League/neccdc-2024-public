@@ -1,0 +1,12 @@
+---
+- name: Deploy Middleware
+  hosts: scorestack
+  gather_facts: true
+  become: true
+  vars_files:
+    - ../vars/score.yml
+
+  tasks:
+    - name: Middleware role
+      include_role:
+        name: ../roles/middleware

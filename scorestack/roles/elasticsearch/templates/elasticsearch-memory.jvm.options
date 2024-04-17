@@ -1,0 +1,2 @@
+-Xms{{ elastic_ram_gb }}g
+-Xmx{{ elastic_ram_gb }}g

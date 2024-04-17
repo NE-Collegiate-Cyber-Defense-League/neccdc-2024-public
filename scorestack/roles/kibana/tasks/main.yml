@@ -1,0 +1,54 @@
+---
+- name: Wait for cluster status to be green
+  ansible.builtin.uri:
+    url: "{{ elastic_url }}/_cluster/health?wait_for_status=green&timeout=1m"
+    force_basic_auth: true
+    timeout: 60
+    url_username: "{{ elastic_username }}"
+    url_password: "{{ elastic_password }}"
+    validate_certs: false
+  changed_when: false
+
+- name: Install Kibana package
+  ansible.builtin.apt:
+    deb: https://artifacts.elastic.co/downloads/kibana/kibana-7.9.2-amd64.deb
+  register: kibana_install
+  retries: 4
+  delay: 15
+  until: kibana_install is successful
+
+- name: Configure Kibana
+  template:
+    src: templates/kibana.yml.j2
+    dest: /etc/kibana/kibana.yml
+    owner: root
+    group: kibana
+  notify:
+    - restart_kibana
+
+- name: Copy certificates
+  ansible.builtin.copy:
+    src: "files/{{ item }}"
+    dest: "/etc/kibana/{{ item }}"
+    owner: root
+    group: kibana
+    mode: 0660
+  loop:
+    - "ca.crt"
+    - "kibana.crt"
+    - "kibana.key"
+  notify:
+    - restart_kibana
+
+- name: Install plugin
+  ansible.builtin.command: /usr/share/kibana/bin/kibana-plugin --allow-root install https://github.com/scorestack/scorestack/releases/download/v0.8.2/kibana-plugin-v0.8.2.zip
+  args:
+    creates: /usr/share/kibana/plugins/scorestack
+  notify:
+    - restart_kibana
+
+- name: Enable Kibana service
+  ansible.builtin.systemd:
+    name: kibana
+    enabled: true
+    state: started

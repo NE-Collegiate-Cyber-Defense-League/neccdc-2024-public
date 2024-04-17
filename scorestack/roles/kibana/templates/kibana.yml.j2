@@ -1,0 +1,24 @@
+---
+csp.strict: true
+
+elasticsearch.hosts: {{ elastic_url }}
+
+elasticsearch.ssl.certificate: /etc/kibana/kibana.crt
+elasticsearch.ssl.key: /etc/kibana/kibana.key
+elasticsearch.ssl.certificateAuthorities:
+  - /etc/kibana/ca.crt
+elasticsearch.ssl.verificationMode: certificate
+
+elasticsearch.username: {{ elastic_username }}
+elasticsearch.password: {{ elastic_password }}
+
+path.data: /var/lib/kibana
+
+server.host: "0.0.0.0"
+server.name: kibana
+
+server.ssl.certificate: /etc/kibana/kibana.crt
+server.ssl.key: /etc/kibana/kibana.key
+server.ssl.certificateAuthorities:
+  - /etc/kibana/ca.crt
+server.ssl.enabled: false

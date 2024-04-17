@@ -1,0 +1,23 @@
+{
+  "name": "SSH_WORKER-1",
+  "type": "ssh",
+  "score_weight": 1,
+  "definition": {
+    "Host": "{{.Host}}",
+    "Port": "2222",
+    "Username": "{{.Username}}",
+    "Password": "{{.worker-1_ubuntu_password}}",
+    "Cmd": "whoami",
+    "MatchContent": "true",
+    "ContentRegex": "{{.Username}}"
+  },
+  "attributes": {
+    "admin": {
+      "Host": "10.0.{{.TeamNumber}}.210",
+      "Username": "ubuntu"
+    },
+    "user": {
+      "worker1_ubuntu_password": "qwerty"
+    }
+  }
+}

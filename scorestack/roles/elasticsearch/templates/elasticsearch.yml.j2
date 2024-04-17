@@ -1,0 +1,32 @@
+---
+cluster.name: {{ elastic_cluster_name }}
+node.name: {{ elastic_node_name }}
+network.host: {{ elastic_network_host }}
+
+discovery.type: single-node
+
+path:
+  logs: /var/log/elasticsearch
+  data: /var/lib/elasticsearch
+  repo:
+    - {{ elastic_snapshot_directory }}
+
+xpack.monitoring.collection.enabled: true
+xpack.monitoring.elasticsearch.collection.enabled: false
+
+xpack.security.enabled: true
+
+xpack.security.authc.realms.native.native1.order: 0
+
+xpack.security.http.ssl.enabled: {{ elk_ssl }}
+xpack.security.http.ssl.key: /etc/elasticsearch/elasticsearch.key
+xpack.security.http.ssl.certificate: /etc/elasticsearch/elasticsearch.crt
+xpack.security.http.ssl.certificate_authorities:
+  - /etc/elasticsearch/ca.crt
+
+xpack.security.transport.ssl.enabled: {{ elk_ssl }}
+xpack.security.transport.ssl.key: /etc/elasticsearch/elasticsearch.key
+xpack.security.transport.ssl.certificate: /etc/elasticsearch/elasticsearch.crt
+xpack.security.transport.ssl.certificate_authorities:
+  - /etc/elasticsearch/ca.crt
+xpack.security.transport.ssl.verification_mode: certificate

@@ -1,0 +1,23 @@
+{
+  "name": "SSH_CONTROL_PLANE",
+  "type": "ssh",
+  "score_weight": 1,
+  "definition": {
+    "Host": "{{.Host}}",
+    "Port": "2222",
+    "Username": "{{.Username}}",
+    "Password": "{{.controlplane_ubuntu_password}}",
+    "Cmd": "whoami",
+    "MatchContent": "true",
+    "ContentRegex": "{{.Username}}"
+  },
+  "attributes": {
+    "admin": {
+      "Host": "10.0.{{.TeamNumber}}.200",
+      "Username": "ubuntu"
+    },
+    "user": {
+      "controlplane_ubuntu_password": "qwerty"
+    }
+  }
+}

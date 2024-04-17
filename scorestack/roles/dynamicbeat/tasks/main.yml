@@ -1,0 +1,122 @@
+---
+- name: Create directory for Dynamicbeat
+  ansible.builtin.file:
+    path: "{{ dynamicbeat_home }}"
+    state: directory
+
+- name: Copy Dynamicbeat binary to host
+  ansible.builtin.copy:
+    src: files/dynamicbeat
+    dest: "{{ dynamicbeat_bin_path }}"
+    mode: 0755
+
+- name: Update sysctl settings
+  ansible.posix.sysctl:
+    name: "{{ item.name }}"
+    value: "{{ item.value }}"
+    state: present
+  loop:
+    - { name: 'net.ipv4.ping_group_range', value: '0 2147483647' }
+    - { name: 'vm.max_map_count', value: '262144' }
+
+- name: Create Dynamicbeat service file from template
+  ansible.builtin.template:
+    src: templates/dynamicbeat.service.j2
+    dest: "{{ dynamicbeat_service_file }}"
+    mode: 0644
+
+- name: Reload systemd daemon
+  ansible.builtin.systemd:
+    daemon_reload: true
+
+- name: Update dynamicbeat config from template
+  ansible.builtin.template:
+    src: templates/dynamicbeat.yml.j2
+    dest: "{{ dynamicbeat_config_path }}"
+
+- name: Wait for cluster status to be green
+  uri:
+    url: "{{ elastic_url }}/_cluster/health?wait_for_status=green&timeout=1m"
+    force_basic_auth: yes
+    timeout: 60
+    url_username: "{{ elastic_username }}"
+    url_password: "{{ elastic_password }}"
+    validate_certs: no
+  changed_when: no
+
+- name: Run dynamicbeat setup for elastic and kibana 
+  ansible.builtin.command: "{{ dynamicbeat_setup_command }}"
+  register: dynamicbeat_setup
+
+- name: Ensure Dynamicbeat password is set
+  block:
+    - name: Authenticate to Elastic
+      ansible.builtin.uri:
+        url: "{{ elastic_url }}/_security/_authenticate"
+        force_basic_auth: true
+        status_code: [200, 401]
+        url_username: "{{ dynamicbeat_username }}"
+        url_password: "{{ dynamicbeat_password }}"
+        validate_certs: false
+      register: dynamicbeat_auth
+
+    - name: Set Dynamicbeat password
+      ansible.builtin.uri:
+        url: "{{ elastic_url }}/_security/user/{{ dynamicbeat_username }}/_password"
+        body: '{"password": "{{ dynamicbeat_password }}"}'
+        body_format: json
+        force_basic_auth: true
+        method: POST
+        url_username: "{{ elastic_username }}"
+        url_password: "{{ elastic_password }}"
+        validate_certs: false
+      when: dynamicbeat_auth.status == 401
+  when: dynamicbeat_setup.rc == 0
+
+- name: Update each teams elastic password
+  ansible.builtin.uri:
+    url: "{{ elastic_url }}/_security/user/{{ item.name }}/_password"
+    body: '{"password": "{{ item.elk_password }}"}'
+    body_format: json
+    status_code: [200]
+    force_basic_auth: true
+    method: POST
+    url_username: "{{ elastic_username }}"
+    url_password: "{{ elastic_password }}"
+    validate_certs: false
+  loop: "{{ dynamicbeat_teams }}"
+  when: dynamicbeat_setup.rc == 0
+
+- name: Create Elasticsearch Roles
+  ansible.builtin.uri:
+    url: "{{ elastic_url }}/_security/role/{{ item.name }}"
+    body: "{{ item.request_body }}"
+    body_format: json
+    status_code: [200]
+    force_basic_auth: true
+    method: POST
+    url_username: "{{ elastic_username }}"
+    url_password: "{{ elastic_password }}"
+    validate_certs: false
+  loop: "{{ dynamicbeat_roles }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when: dynamicbeat_setup.rc == 0
+
+- name: Create Elasticsearch Users
+  ansible.builtin.uri:
+    url: "{{ elastic_url }}/_security/user/{{ item.name }}"
+    body:
+      password: "{{ item.password }}"
+      roles: "{{ item.roles }}"
+    body_format: json
+    status_code: [200]
+    force_basic_auth: true
+    method: POST
+    url_username: "{{ elastic_username }}"
+    url_password: "{{ elastic_password }}"
+    validate_certs: false
+  loop: "{{ dynamicbeat_users }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when: dynamicbeat_setup.rc == 0

@@ -1,0 +1,23 @@
+{
+    "name": "SSH_IDM",
+    "type": "ssh",
+    "score_weight": 1,
+    "definition": {
+        "Host": "{{.Host}}",
+        "Port": "22",
+        "Username": "{{.Username}}",
+        "Password": "{{.idm_root_password}}",
+        "Cmd": "whoami",
+        "MatchContent": "true",
+        "ContentRegex": "{{.Username}}"
+    },
+    "attributes": {
+        "admin": {
+            "Host": "10.0.{{.TeamNumber}}.132",
+            "Username": "root"
+        },
+        "user": {
+            "idm_root_password": "password"
+        }
+    }
+}

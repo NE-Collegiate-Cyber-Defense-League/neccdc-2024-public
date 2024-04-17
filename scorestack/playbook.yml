@@ -1,0 +1,12 @@
+--- 
+- name: Deploy ELK Stack
+  ansible.builtin.import_playbook: playbooks/elk.yml
+  tags: [elk]
+
+- name: Deploy Nginx
+  ansible.builtin.import_playbook: playbooks/nginx.yml
+  tags: [nginx]
+
+- name: Deploy Dynamicbeat
+  ansible.builtin.import_playbook: playbooks/dynamicbeat.yml
+  tags: [dynamicbeat]

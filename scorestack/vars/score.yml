@@ -1,0 +1,99 @@
+---
+elk_ssl: false
+kibana_url: "{{ elk_ssl | ternary('https://localhost:5601', 'http://localhost:5601') }}"
+elastic_url: "{{ elk_ssl | ternary('https://localhost:9200', 'http://localhost:9200') }}"
+elastic_username: elastic
+elastic_password: PASSWORD
+elastic_ram_gb: 16
+elastic_snapshot_repository: "backup"
+elastic_snapshot_directory: /mount/backups
+elastic_snapshot_policy: default
+
+dynamicbeat_username: dynamicbeat
+dynamicbeat_password: PASSWORD
+dynamicbeat_verbose: true
+dynamicbeat_home: /opt/dynamicbeat
+dynamicbeat_bin_path: "{{ dynamicbeat_home }}/dynamicbeat"
+dynamicbeat_config_path: "{{ dynamicbeat_home }}/dynamicbeat.yml"
+dynamicbeat_checks_src: files/checks/
+dynamicbeat_checks_dest: "{{ dynamicbeat_home }}/checks.d"
+dynamicbeat_checks_command: "{{ dynamicbeat_bin_path }} setup checks {{ dynamicbeat_checks_dest }} --config {{ dynamicbeat_config_path }}"
+
+dynamicbeat_roles:
+  - name: common
+    request_body:
+      indices:
+        - names:
+            - checks
+          privileges:
+            - read
+      applications:
+        - application: "kibana-.kibana"
+          privileges:
+            - space_read
+          resources:
+            - "space:scorestack"
+  - name: spectator
+    request_body:
+      indices:
+        - names:
+            - results-all
+          privileges:
+            - read
+
+dynamicbeat_users:
+  - name: whiteteam
+    password: PASSWORD
+    roles: ["common", "spectator"]
+  - name: redteam
+    password: PASSWORD
+    roles: ["common", "spectator"]
+  - name: guest
+    password: PASSWORD
+    roles: ["common", "spectator"]
+
+dynamicbeat_teams:
+  - name: team00
+    overrides:
+      TeamNumber: 0
+    elk_password: PASSWORD
+  - name: team01
+    overrides:
+      TeamNumber: 1
+    elk_password: PASSWORD
+  - name: team02
+    overrides:
+      TeamNumber: 2
+    elk_password: PASSWORD
+  - name: team03
+    overrides:
+      TeamNumber: 3
+    elk_password: PASSWORD
+  - name: team04
+    overrides:
+      TeamNumber: 4
+    elk_password: PASSWORD
+  - name: team05
+    overrides:
+      TeamNumber: 5
+    elk_password: PASSWORD
+  - name: team06
+    overrides:
+      TeamNumber: 6
+    elk_password: PASSWORD
+  - name: team07
+    overrides:
+      TeamNumber: 7
+    elk_password: PASSWORD
+  - name: team08
+    overrides:
+      TeamNumber: 8
+    elk_password: PASSWORD
+  - name: team09
+    overrides:
+      TeamNumber: 9
+    elk_password: PASSWORD
+  - name: team10
+    overrides:
+      TeamNumber: 10
+    elk_password: PASSWORD

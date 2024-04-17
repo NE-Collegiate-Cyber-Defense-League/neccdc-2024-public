@@ -1,0 +1,26 @@
+{
+  "name": "Semaphore_Web",
+  "type": "http",
+  "score_weight": 2,
+  "definition": {
+    "requests": [
+      {
+        "host": "{{.Host}}",
+        "path": "/ping",
+        "https": false,
+        "port": 80,
+        "method": "GET",
+        "headers": {
+          "Accept": "text/plain"
+        },
+        "matchcode": true,
+        "code": 200
+      }
+    ]
+  },
+  "attributes": {
+    "admin": {
+      "Host": "10.0.{{.TeamNumber}}.164"
+    }
+  }
+}

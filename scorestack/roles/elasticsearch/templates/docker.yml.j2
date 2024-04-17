@@ -1,0 +1,18 @@
+# Module: docker
+# Docs: https://www.elastic.co/guide/en/beats/metricbeat/7.9/metricbeat-module-docker.html
+
+- module: docker
+  metricsets:
+    - container
+    - cpu
+    - diskio
+    - event
+    - healthcheck
+    - info
+    - memory
+    - network
+  period: 10s
+  hosts: ["unix:///var/run/docker.sock"]
+
+  # If set to true, replace dots in labels with `_`.
+  #labels.dedot: false

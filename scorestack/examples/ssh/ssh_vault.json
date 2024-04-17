@@ -1,0 +1,23 @@
+{
+    "name": "SSH_VAULT",
+    "type": "ssh",
+    "score_weight": 1,
+    "definition": {
+        "Host": "{{.Host}}",
+        "Port": "22",
+        "Username": "{{.Username}}",
+        "Password": "{{.vault_vault_password}}",
+        "Cmd": "whoami",
+        "MatchContent": "true",
+        "ContentRegex": "{{.Username}}"
+    },
+    "attributes": {
+        "admin": {
+            "Host": "10.0.{{.TeamNumber}}.133",
+            "Username": "vault"
+        },
+        "user": {
+            "vault_vault_password": "waffles142"
+        }
+    }
+}

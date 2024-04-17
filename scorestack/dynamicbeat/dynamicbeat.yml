@@ -1,0 +1,22 @@
+verify_certs: false
+round_time: 10s
+
+log:
+  level: -1
+  no_color: true
+  verbose: true
+
+# Creds dynamicbeat uses to connect to elk
+username: dynamicbeat
+password: KgQPGaR*8a7
+
+elasticsearch: http://18.119.58.45:9200
+setup:
+  kibana: http://18.119.58.45:5601
+  username: elastic
+  password: QvDX&VAGZ93kW3
+
+teams:
+- name: "team00"
+  overrides:
+    TeamNumber: "0"

@@ -1,0 +1,50 @@
+---
+- name: Competition Control
+  hosts: scorestack
+  gather_facts: false
+  become: true
+  vars_files:
+    - ../vars/score.yml
+
+  tasks:
+    - name: Stop Dynamicbeat service
+      ansible.builtin.service:
+        name: dynamicbeat
+        enabled: false
+        state: stopped
+      tags: [stop, end]
+
+    - name: Setup Dynamicbeat Checks
+      block:
+        - name: Check if checks folder is present
+          ansible.builtin.stat:
+            path: "{{ dynamicbeat_checks_dest }}"
+          register: dynamicbeat_checks_folder
+        
+        - name: Remove checks folder
+          ansible.builtin.file:
+            path: "{{ dynamicbeat_checks_dest }}"
+            state: absent
+          when: dynamicbeat_checks_folder.stat.exists == true
+
+        - name: Copy checks to host
+          ansible.builtin.copy:
+            src: "{{ dynamicbeat_checks_src }}"
+            dest: "{{ dynamicbeat_checks_dest }}"
+            mode: 0755
+        
+        - name: Import checks into Dynamicbeat
+          ansible.builtin.command:
+            cmd: "{{ dynamicbeat_checks_command }}"
+          register: dynamicbeat_checks
+
+        - ansible.builtin.debug: var=dynamicbeat_checks.stderr_lines
+          when: dynamicbeat_checks.stderr_lines is defined and dynamicbeat_checks.stderr_lines | length > 0
+      tags: [import, begin]
+
+    - name: Start Dynamicbeat service
+      ansible.builtin.service:
+        name: dynamicbeat
+        enabled: true
+        state: started
+      tags: [start, begin]

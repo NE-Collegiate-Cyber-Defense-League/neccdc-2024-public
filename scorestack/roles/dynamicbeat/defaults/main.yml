@@ -1,0 +1,18 @@
+dynamicbeat_setup_install: true
+dynamicbeat_setup_update: true
+
+dynamicbeat_username: dynamicbeat
+dynamicbeat_password: changeme
+
+dynamicbeat_home: /opt/dynamicbeat
+dynamicbeat_bin_path: "{{ dynamicbeat_home }}/dynamicbeat"
+dynamicbeat_config_path: "{{ dynamicbeat_home }}/dynamicbeat.yml"
+
+dynamicbeat_service_file: /etc/systemd/system/dynamicbeat.service
+dynamicbeat_service_args: "run --config {{ dynamicbeat_config_path }}"
+dynamicbeat_service_exec: "{{ dynamicbeat_bin_path }} {{ dynamicbeat_service_args }}"
+
+dynamicbeat_setup_command: "{{ dynamicbeat_bin_path }} setup --config {{ dynamicbeat_config_path }}"
+dynamicbeat_checks_src: "files/checks" # User provided to the role
+dynamicbeat_checks_dest: "{{ dynamicbeat_home }}/checks.d"
+dynamicbeat_checks_command: "{{ dynamicbeat_bin_path }} setup checks {{ dynamicbeat_checks_dest }} --config {{ dynamicbeat_config_path }}"

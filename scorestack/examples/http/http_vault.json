@@ -1,0 +1,26 @@
+{
+    "name": "Vault_Web",
+    "type": "http",
+    "score_weight": 2,
+    "definition": {
+      "requests": [
+        {
+          "host": "{{.Host}}",
+          "path": "/v1/sys/health",
+          "https": false,
+          "port": 8200,
+          "method": "GET",
+          "headers": {
+            "Accept": "text/plain"
+          },
+          "matchcode": true,
+          "code": 200
+        }
+      ]
+    },
+    "attributes": {
+      "admin": {
+        "Host": "10.0.{{.TeamNumber}}.133"
+      }
+    }
+  }

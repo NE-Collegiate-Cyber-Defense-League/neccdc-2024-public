@@ -1,0 +1,22 @@
+{
+    "name": "PLC_MODBUS",
+    "type": "http",
+    "score_weight": 1,
+    "definition": {
+        "requests": [
+            {
+                "host": "score.rust.energy",
+                "path": "/plc/{{.Host}}/8080",
+                "https": true,
+                "method": "GET",
+                "matchcode": true,
+                "code": 200
+            }
+        ]
+    },
+    "attributes": {
+        "admin": {
+            "Host": "10.0.{{.TeamNumber}}.244"
+        }
+    }
+}

@@ -1,0 +1,26 @@
+{
+    "name": "KUBE_POSTGRES",
+    "type": "http",
+    "score_weight": 1,
+    "definition": {
+        "requests": [
+            {
+                "host": "score.rust.energy",
+                "path": "/postgres/{{.Host}}?username={{.Username}}&password={{.Password}}",
+                "https": true,
+                "method": "GET",
+                "matchcode": true,
+                "code": 200
+            }
+        ]
+    },
+    "attributes": {
+        "admin": {
+            "Host": "10.0.{{.TeamNumber}}.200"
+        },
+        "user": {
+            "Username": "postgres",
+            "Password": "password123"
+        }
+    }
+}

@@ -1,0 +1,37 @@
+---
+- name: Deploy Nginx
+  hosts: scorestack
+  gather_facts: false
+  become: true
+  vars_files:
+    - ../vars/score.yml
+
+  tasks:
+    - name: Install Nginx package
+      ansible.builtin.package:
+        name: nginx
+        state: latest
+
+    - name: Remove sites-default
+      ansible.builtin.file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+
+    - name: Configure Nginx
+      ansible.builtin.copy:
+        src: ../files/nginx/
+        dest: /etc/nginx/
+      notify:
+        - Restart Nginx
+
+    - name: Enable Nginx
+      ansible.builtin.systemd:
+        name: nginx
+        enabled: yes
+
+  handlers:
+
+    - name: Restart Nginx
+      ansible.builtin.systemd:
+        name: nginx
+        state: restarted

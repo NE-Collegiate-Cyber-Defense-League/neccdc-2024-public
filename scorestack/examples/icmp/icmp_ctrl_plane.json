@@ -1,0 +1,13 @@
+{
+    "name": "ICMP_CONTROL_PLANE",
+    "type": "icmp",
+    "score_weight": 1,
+    "definition": {
+      "host": "{{.Host}}"
+    },
+    "attributes": {
+      "admin": {
+        "Host": "10.0.{{.TeamNumber}}.200"
+      }
+    }
+  }

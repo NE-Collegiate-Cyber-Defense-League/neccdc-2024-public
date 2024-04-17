@@ -1,0 +1,11 @@
+elastic_username: elastic
+elastic_password: changeme
+elastic_bootstrap_password: changeme
+elastic_ram_gb: 4
+
+elastic_url: "http://localhost:9200"
+elastic_cluster_name: "scorestack"
+elastic_node_name: "elasticsearch"
+elastic_network_host: "0.0.0.0"
+
+elastic_snapshot_directory: /mount/backups

@@ -1,0 +1,222 @@
+---
+- name: Install Default JRE
+  ansible.builtin.apt:
+    name: default-jre
+    state: present
+    update_cache: true
+
+- name: Install Elasticsearch package
+  ansible.builtin.apt:
+    deb: https://artifacts.elastic.co/downloads/elasticsearch/elasticsearch-7.9.2-amd64.deb
+  register: elasticsearch_install
+  retries: 4
+  delay: 15
+  until: elasticsearch_install is successful
+
+- name: Configure JVM
+  ansible.builtin.template:
+    src: templates/elasticsearch-memory.jvm.options
+    dest: /etc/elasticsearch/jvm.options.d/elasticsearch-memory.jvm.options
+    owner: root
+    group: elasticsearch
+    mode: 0660
+
+- name: Configure limits
+  ansible.builtin.pam_limits:
+    domain: elasticsearch
+    limit_item: "{{ item.item }}"
+    limit_type: "-"
+    value: "{{ item.value }}"
+  loop:
+    - { item: "nofile", value: "65535" }
+    - { item: "nproc", value: "4096" }
+
+- name: Increase memory limits
+  ansible.posix.sysctl:
+    name: vm.max_map_count
+    sysctl_set: true
+    value: "262144"
+
+- name: Reduce swappiness
+  ansible.posix.sysctl:
+    name: vm.swappiness
+    sysctl_set: true
+    value: "1"
+
+- name: Copy certificates
+  ansible.builtin.copy:
+    src: "files/{{ item }}"
+    dest: "/etc/elasticsearch/{{ item }}"
+    owner: root
+    group: elasticsearch
+    mode: 0660
+  loop:
+    - "ca.crt"
+    - "elasticsearch.crt"
+    - "elasticsearch.key"
+
+- name: Create snapshot repository directory
+  ansible.builtin.file:
+    path: "{{ elastic_snapshot_directory }}"
+    state: directory
+    owner: root
+    group: elasticsearch
+    mode: 0770
+    recurse: true
+
+- name: Configure Elasticsearch
+  ansible.builtin.template:
+    src: templates/elasticsearch.yml.j2
+    dest: /etc/elasticsearch/elasticsearch.yml
+    owner: root
+    group: elasticsearch
+
+- name: Enable Elasticsearch
+  ansible.builtin.service:
+    name: elasticsearch
+    enabled: true
+    state: started
+
+###############################################################################
+# Elastic UJser
+###############################################################################
+
+- name: Check if elastic user password is set
+  ansible.builtin.uri:
+    url: "{{ elastic_url }}/_cluster/health"
+    force_basic_auth: true
+    status_code: [200, 401]
+    url_username: "{{ elastic_username }}"
+    url_password: "{{ elastic_password }}"
+    validate_certs: false
+  register: bootstrap_req
+  until: '"Connection refused" not in bootstrap_req.msg'
+
+- name: Set elastic user password
+  block:
+    - name: Stop Elasticsearch
+      ansible.builtin.systemd:
+        name: elasticsearch
+        state: stopped
+    
+    - name: Check if bootstrap password is set
+      ansible.builtin.command: /usr/share/elasticsearch/bin/elasticsearch-keystore list
+      changed_when: false
+      register: elasticsearch_keystore_keys
+    
+    - name: Set bootstrap password
+      ansible.builtin.shell: "echo {{ elastic_bootstrap_password }} | /usr/share/elasticsearch/bin/elasticsearch-keystore add bootstrap.password --stdin"
+      when: '"bootstrap.password" not in elasticsearch_keystore_keys.stdout'
+    
+    - name: Start Elasticsearch
+      ansible.builtin.systemd:
+        name: elasticsearch
+        state: started
+    
+    - name: Set elastic user password
+      ansible.builtin.uri:
+        url: "{{ elastic_url }}/_xpack/security/user/elastic/_password"
+        body: '{"password": "{{ elastic_password }}"}'
+        body_format: json
+        force_basic_auth: true
+        method: PUT
+        url_username: "{{ elastic_username }}"
+        url_password: "{{ elastic_bootstrap_password }}"
+        validate_certs: false
+      notify:
+        - restart_elasticsearch
+  when: bootstrap_req.status == 401
+
+###############################################################################
+# Snapshot
+###############################################################################
+
+- name: Create snapshot repository
+  ansible.builtin.uri:
+    url: "{{ elastic_url }}/_snapshot/{{ elastic_snapshot_repository }}"
+    body: '{"type": "fs", "settings": {"location": "{{ elastic_snapshot_directory }}"}}'
+    body_format: json
+    force_basic_auth: true
+    method: PUT
+    status_code: [200]
+    url_username: "{{ elastic_username }}"
+    url_password: "{{ elastic_password }}"
+    validate_certs: false
+
+- name: Create snapshot policy
+  ansible.builtin.uri:
+    url: "{{ elastic_url }}/_slm/policy/{{ elastic_snapshot_policy }}"
+    body: '{"schedule": "0 0 0/2 1/1 * ? *", "name": "{{ elastic_snapshot_policy }}", "repository": "{{ elastic_snapshot_repository }}", "config": {"indices": "*", "include_global_state": true}}}'
+    body_format: json
+    force_basic_auth: true
+    method: PUT
+    status_code: [200]
+    url_username: "{{ elastic_username }}"
+    url_password: "{{ elastic_password }}"
+    validate_certs: false
+
+- name: Create index template to set default number of replicas
+  ansible.builtin.uri:
+    url: "{{ elastic_url }}/_template/default"
+    body: '{"index_patterns": ["*"], "settings": {"number_of_shards": 1, "number_of_replicas": 0}}'
+    body_format: json
+    force_basic_auth: true
+    method: PUT
+    status_code: [200]
+    url_username: "{{ elastic_username }}"
+    url_password: "{{ elastic_password }}"
+    validate_certs: false
+
+###############################################################################
+# Metricbeat
+###############################################################################
+
+- name: Install metricbeat deb
+  apt:
+    deb: https://artifacts.elastic.co/downloads/beats/metricbeat/metricbeat-7.9.3-amd64.deb
+
+- name: Copy Metricbeat Template
+  ansible.builtin.template:
+    src: templates/metricbeat.yml.j2
+    dest: /etc/metricbeat/metricbeat.yml
+    mode: 0644
+
+- name: Copy Metricbeat ES Module Template
+  ansible.builtin.template:
+    src: templates/elasticsearch-xpack.yml.j2
+    dest: /etc/metricbeat/modules.d/elasticsearch-xpack.yml
+    mode: 0644
+
+- name: Copy Metricbeat Docker Module Template
+  ansible.builtin.template:
+    src: templates/docker.yml.j2
+    dest: /etc/metricbeat/modules.d/docker.yml
+    mode: 0644
+
+- name: Enable Metricbeat
+  ansible.builtin.service:
+    name: metricbeat
+    enabled: true
+    state: started
+
+#- name: Install filebeat deb
+#  apt:
+#    deb: https://artifacts.elastic.co/downloads/beats/filebeat/filebeat-7.9.3-amd64.deb
+#
+#- name: Copy Filebeat Template
+#  ansible.builtin.template:
+#    src: templates/filebeat.yml.j2
+#    dest: /etc/filebeat/filebeat.yml
+#    mode: 0644
+#
+#- name: Copy Filebeat Nginx Module Template
+#  ansible.builtin.template:
+#    src: templates/nginx.yml.j2
+#    dest: /etc/filebeat/modules.d/nginx.yml
+#    mode: 0644
+#
+#- name: Enable Filebeat
+#  ansible.builtin.service:
+#    name: filebeat
+#    enabled: true
+#    state: started

@@ -1,0 +1,19 @@
+{
+    "name": "AD_LDAP",
+    "type": "ldap",
+    "score_weight": 1,
+    "definition": {
+        "User": "{{.User}}",
+        "Password": "{{.Password}}",
+        "Fqdn": "{{.Fqdn}}",
+        "Port": "389",
+        "Ldaps": "false"
+    },
+    "attributes": {
+        "admin": {
+            "User": "CN=black-team,CN=Users,DC=ad,DC=rust,DC=energy",
+            "Password": "14d3V414!",
+            "Fqdn": "ad.rust.energy"
+        }
+    }
+}

@@ -1,0 +1,16 @@
+---
+- name: Deploy Elastic Stack
+  hosts: scorestack
+  gather_facts: false
+  become: true
+  vars_files:
+    - ../vars/score.yml
+
+  tasks:
+    - name: Elasticsearch Role
+      include_role:
+        name: ../roles/elasticsearch        
+        
+    - name: Kibana role
+      include_role:
+        name: ../roles/kibana

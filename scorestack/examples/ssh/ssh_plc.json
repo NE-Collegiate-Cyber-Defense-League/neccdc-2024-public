@@ -1,0 +1,23 @@
+{
+    "name": "SSH_PLC",
+    "type": "ssh",
+    "score_weight": 1,
+    "definition": {
+        "Host": "{{.Host}}",
+        "Port": "22",
+        "Username": "{{.Username}}",
+        "Password": "{{.plc_admin_password}}",
+        "Cmd": "whoami",
+        "MatchContent": "true",
+        "ContentRegex": "{{.Username}}"
+    },
+    "attributes": {
+        "admin": {
+            "Host": "10.0.{{.TeamNumber}}.244",
+            "Username": "admin"
+        },
+        "user": {
+            "plc_admin_password": "iot4ever"
+        }
+    }
+}

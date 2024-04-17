@@ -1,0 +1,22 @@
+{
+    "name": "KUBE_READY",
+    "type": "http",
+    "score_weight": 2,
+    "definition": {
+        "requests": [
+            {
+                "host": "score.rust.energy",
+                "path": "/kube/{{.Host}}",
+                "https": true,
+                "method": "GET",
+                "matchcode": true,
+                "code": 200
+            }
+        ]
+    },
+    "attributes": {
+        "admin": {
+            "Host": "10.0.{{.TeamNumber}}.200"
+        }
+    }
+}

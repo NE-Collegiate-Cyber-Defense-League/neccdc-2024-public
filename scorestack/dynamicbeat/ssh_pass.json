@@ -1,0 +1,23 @@
+{
+    "name": "SSH_PASS",
+    "type": "ssh",
+    "score_weight": 1,
+    "definition": {
+      "Host": "{{.Host}}",
+      "Port": "2222",
+      "Username": "{{.Username}}",
+      "Password": "{{.Password}}",
+      "Cmd": "whoami",
+      "MatchContent": "true",
+      "ContentRegex": "{{.Username}}"
+    },
+    "attributes": {
+      "admin": {
+        "Host": "10.{{.TeamNumber}}.128.192",
+        "Username": "ubuntu"
+      },
+      "user": {
+        "Password": "password123"
+      }
+    }
+  }

@@ -1,0 +1,24 @@
+verify_certs: false
+round_time: 60s
+
+log:
+  level: {{ dynamicbeat_verbose | ternary(-1, 0) }}
+  no_color: true
+  verbose: {{ dynamicbeat_verbose | lower }}
+
+# Creds dynamicbeat uses to connect to elk
+username: {{ dynamicbeat_username }}
+password: {{ dynamicbeat_password }}
+
+elasticsearch: {{ elastic_url }}
+setup:
+  kibana: {{ kibana_url }}
+  username: {{ elastic_username }}
+  password: {{ elastic_password }}
+
+teams:
+{% for team in dynamicbeat_teams %}
+- name: "{{ team.name }}"
+  overrides:
+    TeamNumber: "{{ team.overrides.TeamNumber }}"
+{% endfor %}

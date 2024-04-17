@@ -1,0 +1,24 @@
+{
+  "elasticsearch": {
+    "indices": [
+      {
+        "names": [
+          "results-{{ .Name }}"
+        ],
+        "privileges": [
+          "read"
+        ]
+      },
+      {
+        "names": [
+          "attrib_user_{{ .Name }}"
+        ],
+        "privileges": [
+          "read",
+          "index",
+          "view_index_metadata"
+        ]
+      }
+    ]
+  }
+}
