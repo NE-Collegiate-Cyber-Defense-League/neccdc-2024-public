@@ -1,14 +1,17 @@
-# NECCDL 2024
+# NECCDC 2024
 
 <!-- Doors pull and push -->
 
-## About the Project
+> [!NOTE]
+> If you have questions about our code or if you are just interested in what the [league](https://neccdl.org/) does **please reach out**.
+> 
+> If reading code is too much work I have [a blog post](https://infrasec.sh/post/neccdc-2024/#infrastructure) that goes over the major elements of the infrastructure.
 
 - [Andrew Iadevaia](https://github.com/andrewiadevaia)
 - [Andrew Aiken](https://github.com/andrew-aiken)
 - [Evan Soroken](https://github.com/ESoro25)
-- [Justin Marwad](https://github.com/justinmarwad)
 - [Manoj Sarma](https://github.com/07Manoj)
+- [Justin Marwad](https://github.com/justinmarwad)
 - [Jason Gendron](https://github.com/jasongendron)
 
 ## Ansible
